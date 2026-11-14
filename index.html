@@ -133,6 +133,32 @@
       <option value="none">بدون صوت</option>
     </select>
     <input id="musicFile" type="file" accept="audio/*" style="display:none;margin-top:8px">
+    <label for="voice">🎙️ التعليق الصوتي</label>
+    <select id="voice">
+      <option value="none">بدون</option>
+      <option value="ai">صوت عربي بالذكاء الاصطناعي</option>
+      <option value="mic">بصوتي (ميكروفون)</option>
+    </select>
+    <div id="aiVoiceBox" style="display:none">
+      <div class="row">
+        <div>
+          <label for="ttsVoice">الصوت</label>
+          <select id="ttsVoice">
+            <option value="Charon">رجل: عميق</option><option value="Orus">رجل: واضح</option>
+            <option value="Fenrir">رجل: قوي</option><option value="Kore">امرأة: هادئ</option><option value="Aoede">امرأة: دافئ</option>
+          </select>
+        </div>
+        <div>
+          <label for="ttsStyle">الأسلوب</label>
+          <select id="ttsStyle"><option value="calm">هادئ وخاشع</option><option value="energetic">حماسي</option><option value="story">قصصي</option></select>
+        </div>
+      </div>
+      <label for="ttsModel">نموذج الصوت</label>
+      <input id="ttsModel" value="gemini-3.1-flash-tts-preview">
+      <div class="hint">يستخدم نفس مفتاح Gemini. إذا ظهر خطأ "model not found" فاكتب اسم نموذج الصوت الأحدث من AI Studio.</div>
+      <button class="sec" id="btnTestVoice">🔊 جرّب الصوت</button>
+    </div>
+    <div id="micHint" class="hint" style="display:none">🎙️ عند الضغط على "اصنع الفيديو" اقرأ النص الظاهر على الشاشة بصوتك. المشاهد ستكون أطول قليلاً لتلحق بالقراءة، واستخدم سماعة بميكروفون في مكان هادئ.</div>
     <div class="hint">الموسيقى المولّدة من صنع التطبيق، فلا توجد مشاكل حقوق. إذا استخدمت ملفاً فتأكد أن لديك حق استخدامه.</div>
   </section>
 
@@ -195,13 +221,15 @@ const isArabic = s => /[؀-ۿ]/.test(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 /* حفظ الإعدادات والحقول */
-['geminiKey', 'geminiModel', 'clientId', 'channelName', 'lang', 'format', 'palette', 'music', 'privacy', 'category', 'sceneCount', 'quality'].forEach(id => {
+['geminiKey', 'geminiModel', 'clientId', 'channelName', 'lang', 'format', 'palette', 'music', 'privacy', 'category', 'sceneCount', 'quality', 'voice', 'ttsVoice', 'ttsStyle', 'ttsModel'].forEach(id => {
   const el = $('#' + id); el.value = store.get(id, el.value);
   el.addEventListener('change', () => store.set(id, el.value.trim()));
 });
 if (!store.get('geminiKey', '') && !store.get('clientId', '')) $('#settingsBox').open = true;
 $('#music').addEventListener('change', () => $('#musicFile').style.display = $('#music').value === 'file' ? 'block' : 'none');
 $('#music').dispatchEvent(new Event('change'));
+$('#voice').addEventListener('change', () => { const v = $('#voice').value; $('#aiVoiceBox').style.display = v === 'ai' ? 'block' : 'none'; $('#micHint').style.display = v === 'mic' ? 'block' : 'none'; });
+$('#voice').dispatchEvent(new Event('change'));
 
 /* ============ 1. السيناريو بالذكاء الاصطناعي ============ */
 function localScript(topic, lang, n) {
@@ -247,7 +275,7 @@ async function generateScript() {
 Write ALL text in ${lang === 'ar' ? 'Modern Standard Arabic' : 'English'}.
 Return ONLY valid JSON with this shape:
 {"title": "catchy title, max 90 characters", "description": "2-4 engaging sentences followed by 3 relevant hashtags", "tags": ["8 to 12 short tags"], "scenes": [{"emoji": "one main emoji (the character of the scene)", "text": "short on-screen sentence, max 14 words", "anim": "one of: bounce, swim, spin, zoom, shake, float, orbit, rain, bubbles, burst", "props": "2 to 4 small related emojis written together, e.g. 🫧🐟🌊"}]}
-Rules: exactly ${n} scenes. Pick the anim that best fits each scene's meaning (e.g. swim for sea animals, rain for weather, burst for surprises) and vary them. Scene 1 is a strong hook. Each scene gives real, accurate, interesting value. The last scene is a call to action (like and subscribe). No markdown.`;
+Rules: exactly ${n} scenes. If the topic is religious (e.g. Islamic), use ONLY well-established authentic information: for the Quran give the meaning with its reference (Surah name and verse number) instead of quoting the Arabic verse text; mention a hadith only if it is in Sahih al-Bukhari or Sahih Muslim and name the source; never invent or attribute anything uncertain; keep a respectful tone and use respectful emojis like 🕋🕌📖🌙⭐🤲 (no faces). Each scene text will also be read aloud, so write it as a natural, complete spoken sentence. Pick the anim that best fits each scene's meaning (e.g. swim for sea animals, rain for weather, burst for surprises) and vary them. Scene 1 is a strong hook. Each scene gives real, accurate, interesting value. The last scene is a call to action (like and subscribe). No markdown.`;
   try {
     const model = ($('#geminiModel').value.trim() || 'gemini-3.8-flash');
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
@@ -524,6 +552,60 @@ async function playFileMusic(actx, dest, file, duration) {
   src.connect(g); g.connect(dest); src.start(t0); src.stop(t0 + duration + 0.1);
 }
 
+/* ============ الصوت بالذكاء الاصطناعي ============ */
+const ttsCache = new Map();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const STYLES = {
+  calm: 'Read the following Arabic text aloud in a calm, warm and reverent voice, in clear Modern Standard Arabic (فصحى) with correct pronunciation',
+  energetic: 'Read the following Arabic text aloud in an energetic, engaging YouTube narrator voice, in clear Modern Standard Arabic',
+  story: 'Read the following text aloud like a captivating storyteller, with natural pauses'
+};
+async function ttsScene(actx, text) {
+  const key = $('#geminiKey').value.trim();
+  if (!key) throw new Error('الصوت بالذكاء الاصطناعي يحتاج مفتاح Gemini في الإعدادات');
+  const model = $('#ttsModel').value.trim() || 'gemini-3.1-flash-tts-preview', voice = $('#ttsVoice').value, style = $('#ttsStyle').value;
+  const ck = [model, voice, style, text].join('|');
+  let audio = ttsCache.get(ck);
+  for (let attempt = 0; !audio; attempt++) {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `${STYLES[style] || STYLES.calm}:\n${text}` }] }],
+        generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } }
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if ((res.status === 429 || res.status === 503) && attempt < 3) { toast('⏳ ضغط على خدمة الصوت، انتظار 20 ثانية...'); await sleep(20000); continue; }
+    if (!res.ok) throw new Error('الصوت: ' + (data.error?.message || ('HTTP ' + res.status)));
+    const part = (data.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.data);
+    if (!part) throw new Error('لم يرجع صوت من Gemini');
+    audio = { b64: part.inlineData.data, mime: part.inlineData.mimeType || '' };
+    ttsCache.set(ck, audio);
+  }
+  return audioToBuffer(actx, audio);
+}
+async function audioToBuffer(actx, { b64, mime }) {
+  const bin = atob(b64);
+  if (mime && !/l16|pcm/i.test(mime)) { // wav / mp3
+    const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return await actx.decodeAudioData(bytes.buffer);
+  }
+  const rate = +((/rate=(\d+)/i.exec(mime) || [])[1] || 24000), n = bin.length >> 1;
+  const buf = actx.createBuffer(1, n, rate), ch = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) { let v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8); if (v >= 32768) v -= 65536; ch[i] = v / 32768; }
+  return buf;
+}
+$('#btnTestVoice').addEventListener('click', async () => {
+  const btn = $('#btnTestVoice'), actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume();
+  btn.disabled = true; btn.textContent = '⏳ جاري توليد الصوت...';
+  try {
+    const sample = parseScenes()[0]?.text || 'السلام عليكم ورحمة الله وبركاته، أهلاً بكم في قناتنا';
+    const b = await ttsScene(actx, sample), src = actx.createBufferSource(); src.buffer = b; src.connect(actx.destination); src.start();
+    src.onended = () => actx.close();
+  } catch (e) { toast(e.message, 'err'); actx.close(); }
+  finally { btn.disabled = false; btn.textContent = '🔊 جرّب الصوت'; }
+});
+
 /* ============ 4. التسجيل ============ */
 let videoBlob = null, videoUrl = null;
 function pickMime() {
@@ -532,6 +614,10 @@ function pickMime() {
 }
 
 async function makeVideo() {
+  const actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume();
+  try { return await makeVideoInner(actx); } finally { try { actx.close(); } catch (e) {} }
+}
+async function makeVideoInner(actx) {
   const scenes = parseScenes();
   if (!scenes.length) return toast('اكتب المشاهد أولاً (أو اضغط "اكتب السيناريو")', 'err');
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('متصفحك لا يدعم صنع الفيديو. استخدم Chrome', 'err');
@@ -544,24 +630,35 @@ async function makeVideo() {
   const vertical = $('#format').value === '9:16', hd = $('#quality').value === 'hd';
   const S = hd ? [720, 1280] : [540, 960], W = vertical ? S[0] : S[1], H = vertical ? S[1] : S[0];
   const cv = $('#cv'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
-  const durs = scenes.map(sceneDuration), starts = []; let acc = 0; durs.forEach(d => { starts.push(acc); acc += d; });
+  const voiceMode = $('#voice').value; let voices = null, micStream = null;
+  if (voiceMode === 'ai') {
+    voices = [];
+    for (let i = 0; i < scenes.length; i++) { status.textContent = `🔊 توليد الصوت العربي ${i + 1} من ${scenes.length}...`; voices.push(await ttsScene(actx, scenes[i].text)); }
+  } else if (voiceMode === 'mic') {
+    status.textContent = '🎙️ اسمح للتطبيق باستخدام الميكروفون...';
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  }
+  const durs = scenes.map((sc, i) => voices ? Math.max(sceneDuration(sc), voices[i].duration + 0.9) : micStream ? sceneDuration(sc) * 1.45 : sceneDuration(sc)), starts = []; let acc = 0; durs.forEach(d => { starts.push(acc); acc += d; });
   const totalDur = acc + 0.4;
   const title = $('#title').value.trim(), channel = $('#channelName').value.trim(), pal = $('#palette').value;
 
   const stream = cv.captureStream(30);
-  let actx = null;
   const music = $('#music').value;
+  await actx.resume();
+  const dest = actx.createMediaStreamDestination();
+  let hasAudio = !!(voices || micStream);
   try {
+    const musicBus = actx.createGain(); musicBus.gain.value = hasAudio ? 0.3 : 1; musicBus.connect(dest);
     if (music !== 'none') {
-      actx = new (window.AudioContext || window.webkitAudioContext)(); await actx.resume();
-      const dest = actx.createMediaStreamDestination();
       if (music === 'file') {
         const f = $('#musicFile').files[0];
-        if (f) await playFileMusic(actx, dest, f, totalDur); else { toast('لم تختر ملف موسيقى — سأستخدم موسيقى مولّدة'); scheduleMusic(actx, dest, 'upbeat', totalDur); }
-      } else scheduleMusic(actx, dest, music, totalDur);
-      dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
+        if (f) await playFileMusic(actx, musicBus, f, totalDur); else { toast('لم تختر ملف موسيقى، سأستخدم موسيقى مولّدة'); scheduleMusic(actx, musicBus, 'calm', totalDur); }
+      } else scheduleMusic(actx, musicBus, music, totalDur);
+      hasAudio = true;
     }
-  } catch (e) { toast('تعذّر تشغيل الصوت، سيُصنع الفيديو بدون موسيقى', 'err'); }
+    if (micStream) { const src = actx.createMediaStreamSource(micStream), g = actx.createGain(); g.gain.value = 1.4; src.connect(g); g.connect(dest); }
+  } catch (e) { toast('تعذّر تشغيل الموسيقى', 'err'); }
+  if (hasAudio) dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
 
   const mime = pickMime();
   const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: hd ? 4_000_000 : 2_500_000 } : { videoBitsPerSecond: hd ? 4_000_000 : 2_500_000 });
@@ -569,6 +666,10 @@ async function makeVideo() {
   const done = new Promise(r => rec.onstop = r);
   // ارسم أول إطار قبل البدء
   drawFrame(ctx, W, H, { scene: scenes[0], t: 0, dur: durs[0], idx: 0, total: scenes.length, gt: 0, totalDur, pal, title, channel });
+  if (voices) {
+    const aStart = actx.currentTime + 0.05;
+    voices.forEach((b, i) => { const src = actx.createBufferSource(); src.buffer = b; src.connect(dest); src.connect(actx.destination); src.start(aStart + starts[i] + 0.4); });
+  }
   rec.start(1000);
   const t0 = performance.now();
   await new Promise(resolve => {
@@ -590,7 +691,7 @@ async function makeVideo() {
   rec.requestData();
   await new Promise(r => setTimeout(r, 300));
   rec.stop(); await done;
-  stream.getTracks().forEach(t => t.stop()); if (actx) actx.close();
+  stream.getTracks().forEach(t => t.stop()); if (micStream) micStream.getTracks().forEach(t => t.stop());
   try { wakeLock?.release(); } catch (e) {}
 
   const type = (rec.mimeType || mime || 'video/webm').split(';')[0];
@@ -606,7 +707,7 @@ async function makeVideo() {
   btn.disabled = false; $('#btnUpload').disabled = false;
   toast('✅ الفيديو جاهز!', 'ok');
 }
-$('#btnMake').addEventListener('click', () => makeVideo().catch(e => { toast('خطأ: ' + e.message, 'err'); $('#btnMake').disabled = false; }));
+$('#btnMake').addEventListener('click', () => makeVideo().catch(e => { toast('خطأ: ' + e.message, 'err'); $('#makeStatus').textContent = '❌ ' + e.message; $('#stage').style.display = 'none'; $('#btnMake').disabled = false; }));
 
 $('#btnShare').addEventListener('click', async () => {
   if (!videoBlob) return;
