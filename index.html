@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TubeGenie – صانع فيديوهات يوتيوب بالذكاء الاصطناعي</title>
+<meta name="theme-color" content="#0f0f1a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{--bg:#0f0f1a;--card:#191927;--card2:#222235;--txt:#f1f1f7;--mut:#9a9ab3;--acc:#ff3d57;--acc2:#7c5cff;--ok:#22c55e;--line:#2d2d44}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:Cairo,system-ui,sans-serif;line-height:1.6;padding-bottom:40px}
+  header{padding:18px 16px 8px;text-align:center}
+  header h1{margin:0;font-size:26px;font-weight:900}
+  header h1 span{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  header p{margin:2px 0 0;color:var(--mut);font-size:14px}
+  main{max-width:720px;margin:0 auto;padding:0 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+  .card h2{margin:0 0 10px;font-size:18px;display:flex;align-items:center;gap:8px}
+  .step{background:linear-gradient(135deg,var(--acc),var(--acc2));width:26px;height:26px;border-radius:50%;display:inline-grid;place-items:center;font-size:14px}
+  label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+  input,textarea,select{width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:15px}
+  textarea{min-height:90px;resize:vertical}
+  #scenes{min-height:170px;direction:auto}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  button{font:inherit;font-weight:700;border:0;border-radius:12px;padding:12px 16px;font-size:16px;cursor:pointer;width:100%;margin-top:12px;color:#fff;background:linear-gradient(135deg,var(--acc),var(--acc2))}
+  button.sec{background:var(--card2);border:1px solid var(--line)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  details summary{cursor:pointer;font-weight:700;font-size:16px}
+  .hint{font-size:12px;color:var(--mut);margin-top:4px}
+  .hint a{color:#9db4ff}
+  .stage{position:relative;margin-top:12px;display:none}
+  canvas,video{width:100%;max-height:70vh;object-fit:contain;background:#000;border-radius:12px;display:block}
+  .bar{height:8px;background:var(--card2);border-radius:8px;overflow:hidden;margin-top:8px;display:none}
+  .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .2s}
+  .status{font-size:14px;color:var(--mut);margin-top:6px;min-height:20px}
+  .result{display:none;margin-top:12px}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btns a,.btns button{margin-top:10px}
+  a.btn{display:block;text-align:center;text-decoration:none;color:#fff;font-weight:700;border-radius:12px;padding:12px;background:var(--card2);border:1px solid var(--line)}
+  .note{background:#2a2333;border:1px solid #4a3a5a;border-radius:10px;padding:10px;font-size:13px;margin-top:10px}
+  .yt-link{display:none;margin-top:10px;padding:12px;border-radius:10px;background:#12301e;border:1px solid #1f6b3a;word-break:break-all}
+  .yt-link a{color:#7dffa8;font-weight:700}
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(120px);background:#222235;border:1px solid var(--line);padding:12px 16px;border-radius:12px;max-width:92vw;transition:.3s;z-index:9;font-size:14px}
+  #toast.show{transform:translateX(-50%) translateY(0)}
+  #toast.err{border-color:var(--acc)}
+  #toast.ok{border-color:var(--ok)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎬 <span>TubeGenie</span></h1>
+  <p>اكتب فكرة ← الذكاء الاصطناعي يكتب ويصنع الفيديو ← يُرفع إلى يوتيوب</p>
+</header>
+
+<main>
+  <!-- الإعدادات -->
+  <section class="card">
+    <details id="settingsBox">
+      <summary>⚙️ الإعدادات (مرة واحدة فقط)</summary>
+      <label for="geminiKey">مفتاح Gemini API (مجاني)</label>
+      <input id="geminiKey" type="password" placeholder="AIza..." autocomplete="off">
+      <div class="hint">من <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. بدون مفتاح يعمل التطبيق بسيناريو بسيط.</div>
+      <label for="geminiModel">نموذج Gemini</label>
+      <input id="geminiModel" value="gemini-2.5-flash">
+      <div class="hint">إذا ظهر خطأ "model not found" غيّره لاسم أحدث من صفحة AI Studio.</div>
+      <label for="clientId">Google OAuth Client ID (للرفع إلى يوتيوب)</label>
+      <input id="clientId" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off">
+      <div class="hint">من Google Cloud Console — الخطوات في ملف README.</div>
+      <label for="channelName">اسم قناتك (يظهر كعلامة مائية — اختياري)</label>
+      <input id="channelName" placeholder="@mychannel">
+      <div class="hint">🔒 كل المفاتيح تُحفظ على جهازك فقط.</div>
+    </details>
+  </section>
+
+  <!-- 1. الفكرة -->
+  <section class="card">
+    <h2><span class="step">1</span> فكرة الفيديو</h2>
+    <label for="topic">عن ماذا الفيديو؟</label>
+    <textarea id="topic" placeholder="مثال: 5 حقائق مذهلة عن الفضاء"></textarea>
+    <div class="row">
+      <div>
+        <label for="lang">اللغة</label>
+        <select id="lang"><option value="ar">العربية</option><option value="en">English</option></select>
+      </div>
+      <div>
+        <label for="format">الشكل</label>
+        <select id="format"><option value="9:16">Shorts عمودي 9:16</option><option value="16:9">عادي أفقي 16:9</option></select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="sceneCount">عدد المشاهد</label>
+        <select id="sceneCount"><option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option></select>
+      </div>
+      <div>
+        <label for="palette">الألوان</label>
+        <select id="palette">
+          <option value="neon">نيون</option><option value="sunset">غروب</option><option value="ocean">محيط</option>
+          <option value="forest">غابة</option><option value="gold">ذهبي</option><option value="dark">داكن</option>
+        </select>
+      </div>
+    </div>
+    <button id="btnScript">✨ اكتب السيناريو بالذكاء الاصطناعي</button>
+  </section>
+
+  <!-- 2. السيناريو -->
+  <section class="card">
+    <h2><span class="step">2</span> السيناريو (يمكنك التعديل)</h2>
+    <label for="title">العنوان</label>
+    <input id="title" maxlength="100">
+    <label for="description">الوصف</label>
+    <textarea id="description"></textarea>
+    <label for="tags">الوسوم (مفصولة بفاصلة)</label>
+    <input id="tags">
+    <label for="scenes">المشاهد — سطر لكل مشهد بصيغة: إيموجي | النص</label>
+    <textarea id="scenes" placeholder="🚀 | هل تعلم أن الفضاء صامت تماماً؟&#10;🌌 | ..."></textarea>
+    <label for="music">الموسيقى</label>
+    <select id="music">
+      <option value="upbeat">مولّدة: حماسية</option>
+      <option value="calm">مولّدة: هادئة</option>
+      <option value="epic">مولّدة: ملحمية</option>
+      <option value="file">ملف من جهازي</option>
+      <option value="none">بدون صوت</option>
+    </select>
+    <input id="musicFile" type="file" accept="audio/*" style="display:none;margin-top:8px">
+    <div class="hint">الموسيقى المولّدة من صنع التطبيق، فلا توجد مشاكل حقوق. إذا استخدمت ملفاً فتأكد أن لديك حق استخدامه.</div>
+  </section>
+
+  <!-- 3. صنع الفيديو -->
+  <section class="card">
+    <h2><span class="step">3</span> صنع الفيديو</h2>
+    <button id="btnMake">🎬 اصنع الفيديو</button>
+    <div class="hint">⚠️ أبقِ الشاشة مفتوحة والتطبيق ظاهراً أثناء الصنع (الفيديو يُسجَّل بزمنه الحقيقي).</div>
+    <div class="stage" id="stage"><canvas id="cv"></canvas></div>
+    <div class="bar" id="makeBar"><i></i></div>
+    <div class="status" id="makeStatus"></div>
+    <div class="result" id="result">
+      <video id="preview" controls playsinline></video>
+      <div class="btns">
+        <a class="btn" id="btnDownload" download>⬇️ تحميل</a>
+        <button class="sec" id="btnShare">📲 مشاركة</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. الرفع -->
+  <section class="card">
+    <h2><span class="step">4</span> الرفع إلى يوتيوب</h2>
+    <div class="row">
+      <div>
+        <label for="privacy">الخصوصية</label>
+        <select id="privacy"><option value="private">خاص</option><option value="unlisted">غير مدرج</option><option value="public">عام</option></select>
+      </div>
+      <div>
+        <label for="category">التصنيف</label>
+        <select id="category">
+          <option value="22">أشخاص ومدونات</option><option value="27">تعليم</option><option value="28">علوم وتقنية</option>
+          <option value="24">ترفيه</option><option value="26">نصائح وأساليب</option><option value="17">رياضة</option><option value="20">ألعاب</option>
+        </select>
+      </div>
+    </div>
+    <button id="btnUpload" disabled>📤 ارفع إلى يوتيوب</button>
+    <div class="bar" id="upBar"><i></i></div>
+    <div class="status" id="upStatus"></div>
+    <div class="yt-link" id="ytLink"></div>
+    <div class="note">ℹ️ يوتيوب يجعل الفيديوهات المرفوعة من تطبيقات غير موثّقة <b>خاصة</b> حتى يجتاز التطبيق تدقيق Google. <b>للنشر العام الآن:</b> اضغط "📲 مشاركة" واختر تطبيق يوتيوب، أو حمّل الفيديو وارفعه من التطبيق.</div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+/* ============ أدوات ============ */
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('tg_' + k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('tg_' + k, v); } catch (e) {} }
+};
+let toastTimer;
+function toast(msg, type = '') {
+  const t = $('#toast'); t.textContent = msg; t.className = 'show ' + type;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = type, 4500);
+}
+const isArabic = s => /[؀-ۿ]/.test(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* حفظ الإعدادات والحقول */
+['geminiKey', 'geminiModel', 'clientId', 'channelName', 'lang', 'format', 'palette', 'music', 'privacy', 'category', 'sceneCount'].forEach(id => {
+  const el = $('#' + id); el.value = store.get(id, el.value);
+  el.addEventListener('change', () => store.set(id, el.value.trim()));
+});
+if (!store.get('geminiKey', '') && !store.get('clientId', '')) $('#settingsBox').open = true;
+$('#music').addEventListener('change', () => $('#musicFile').style.display = $('#music').value === 'file' ? 'block' : 'none');
+$('#music').dispatchEvent(new Event('change'));
+
+/* ============ 1. السيناريو بالذكاء الاصطناعي ============ */
+function localScript(topic, lang, n) {
+  const ar = lang === 'ar';
+  const base = ar ? [
+    ['🔥', `هل تعرف كل شيء عن ${topic}؟`], ['💡', `إليك أهم ما يجب معرفته عن ${topic}`],
+    ['📌', 'النقطة الأولى: ابدأ بالأساسيات'], ['🚀', 'النقطة الثانية: التطبيق العملي يصنع الفرق'],
+    ['🎯', 'النقطة الثالثة: الاستمرارية هي السر'], ['🤔', 'أي نقطة فاجأتك أكثر؟ اكتبها في التعليقات'],
+    ['⭐', 'شارك الفيديو مع صديق يحتاجه'], ['👍', 'لا تنسَ الإعجاب والاشتراك']
+  ] : [
+    ['🔥', `Do you really know about ${topic}?`], ['💡', `Here is what you need to know about ${topic}`],
+    ['📌', 'Point one: start with the basics'], ['🚀', 'Point two: practice makes the difference'],
+    ['🎯', 'Point three: consistency is the secret'], ['🤔', 'Which point surprised you? Comment below'],
+    ['⭐', 'Share this with a friend who needs it'], ['👍', "Don't forget to like and subscribe"]
+  ];
+  const scenes = base.slice(0, n - 1).concat([base[7]]).map(([emoji, text]) => ({ emoji, text }));
+  return {
+    title: ar ? `${topic} في أقل من دقيقة!` : `${topic} in under a minute!`,
+    description: ar ? `فيديو سريع عن ${topic}. اشترك للمزيد!` : `A quick video about ${topic}. Subscribe for more!`,
+    tags: [topic], scenes
+  };
+}
+
+function fillScript(s) {
+  $('#title').value = (s.title || '').slice(0, 100);
+  $('#description').value = s.description || '';
+  $('#tags').value = (s.tags || []).join(', ');
+  $('#scenes').value = (s.scenes || []).map(x => `${x.emoji || '✨'} | ${x.text || ''}`).join('\n');
+}
+
+async function generateScript() {
+  const topic = $('#topic').value.trim();
+  if (!topic) return toast('اكتب موضوع الفيديو أولاً', 'err');
+  const key = $('#geminiKey').value.trim();
+  const lang = $('#lang').value, n = +$('#sceneCount').value, shorts = $('#format').value === '9:16';
+  if (!key) {
+    fillScript(localScript(topic, lang, n));
+    return toast('تم إنشاء سيناريو بسيط بدون ذكاء اصطناعي. أضف مفتاح Gemini لنتيجة أفضل');
+  }
+  const btn = $('#btnScript'); btn.disabled = true; btn.textContent = '⏳ الذكاء الاصطناعي يكتب...';
+  const prompt = `You are a top YouTube content creator. Create a ${shorts ? 'YouTube Shorts video (vertical, about 30-45 seconds)' : 'short YouTube video (about 45-60 seconds)'} about: "${topic}".
+Write ALL text in ${lang === 'ar' ? 'Modern Standard Arabic' : 'English'}.
+Return ONLY valid JSON with this shape:
+{"title": "catchy title, max 90 characters", "description": "2-4 engaging sentences followed by 3 relevant hashtags", "tags": ["8 to 12 short tags"], "scenes": [{"emoji": "one emoji", "text": "short on-screen sentence, max 14 words"}]}
+Rules: exactly ${n} scenes. Scene 1 is a strong hook. Each scene gives real, accurate, interesting value. The last scene is a call to action (like and subscribe). No markdown.`;
+  try {
+    const model = ($('#geminiModel').value.trim() || 'gemini-2.5-flash');
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || ('HTTP ' + res.status));
+    let txt = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+    txt = txt.replace(/```json|```/g, '').trim();
+    const a = txt.indexOf('{'), b = txt.lastIndexOf('}');
+    const s = JSON.parse(txt.slice(a, b + 1));
+    if (!Array.isArray(s.scenes) || !s.scenes.length) throw new Error('رد غير مكتمل من الذكاء الاصطناعي');
+    fillScript(s);
+    toast('✅ السيناريو جاهز! راجعه ثم اصنع الفيديو', 'ok');
+  } catch (e) {
+    toast('خطأ من Gemini: ' + e.message, 'err');
+  } finally { btn.disabled = false; btn.textContent = '✨ اكتب السيناريو بالذكاء الاصطناعي'; }
+}
+$('#btnScript').addEventListener('click', generateScript);
+
+function parseScenes() {
+  return $('#scenes').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const i = l.indexOf('|');
+    return i >= 0 ? { emoji: l.slice(0, i).trim(), text: l.slice(i + 1).trim() } : { emoji: '', text: l };
+  }).filter(s => s.text || s.emoji);
+}
+
+/* ============ 2. رسم الفيديو ============ */
+const PALETTES = {
+  neon: [[265, 85, 55], [195, 95, 50]], sunset: [[12, 90, 58], [330, 80, 52]], ocean: [[195, 85, 42], [225, 75, 30]],
+  forest: [[150, 60, 32], [95, 50, 38]], gold: [[40, 90, 50], [20, 85, 40]], dark: [[235, 30, 12], [265, 40, 24]]
+};
+const easeOutBack = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const FONT = 'Cairo, "Segoe UI", Tahoma, sans-serif';
+
+function wrapText(ctx, text, maxW) {
+  const words = text.split(/\s+/), lines = []; let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function sceneDuration(s) { return clamp(2.2 + s.text.length * 0.065, 3, 7); }
+
+function drawFrame(ctx, W, H, o) {
+  const { scene, t, dur, idx, total, gt, totalDur, pal, title, channel } = o;
+  const [c1, c2] = PALETTES[pal] || PALETTES.neon;
+  const shift = idx * 28;
+  const ang = gt * 0.25;
+  // الخلفية
+  const g = ctx.createLinearGradient(W / 2 + Math.cos(ang) * W, H / 2 + Math.sin(ang) * H, W / 2 - Math.cos(ang) * W, H / 2 - Math.sin(ang) * H);
+  g.addColorStop(0, `hsl(${(c1[0] + shift) % 360},${c1[1]}%,${c1[2]}%)`);
+  g.addColorStop(1, `hsl(${(c2[0] + shift) % 360},${c2[1]}%,${c2[2]}%)`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // فقاعات متحركة
+  for (let i = 0; i < 7; i++) {
+    const x = W * (0.5 + 0.45 * Math.sin(gt * 0.3 + i * 1.7)), y = H * (0.5 + 0.45 * Math.cos(gt * 0.22 + i * 2.3));
+    const r = Math.min(W, H) * (0.18 + 0.1 * Math.sin(i + gt * 0.5));
+    const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, 'rgba(255,255,255,0.13)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  // تعتيم خفيف للقراءة
+  ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(0, 0, W, H);
+
+  const vertical = H > W, unit = Math.min(W, H);
+  const fadeIn = clamp(t / 0.35, 0, 1), fadeOut = clamp((dur - t) / 0.35, 0, 1);
+  const alpha = Math.min(fadeIn, fadeOut);
+  const rtl = isArabic(scene.text);
+  ctx.save(); ctx.globalAlpha = alpha; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.direction = rtl ? 'rtl' : 'ltr';
+
+  // الإيموجي
+  if (scene.emoji) {
+    const s = easeOutBack(clamp(t / 0.6, 0, 1));
+    const bob = Math.sin(gt * 2.2) * unit * 0.015;
+    const ey = vertical ? H * 0.3 : H * 0.28;
+    ctx.save(); ctx.translate(W / 2, ey + bob); ctx.scale(s, s); ctx.rotate(Math.sin(gt * 1.5) * 0.06);
+    ctx.font = `${Math.round(unit * (vertical ? 0.26 : 0.22))}px ${FONT}`;
+    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = unit * 0.04;
+    ctx.fillText(scene.emoji, 0, 0); ctx.restore();
+  }
+
+  // النص (كلمة بكلمة)
+  const fs = Math.round(unit * (vertical ? 0.078 : 0.085));
+  ctx.font = `900 ${fs}px ${FONT}`;
+  const lines = wrapText(ctx, scene.text, W * (vertical ? 0.84 : 0.8));
+  const words = scene.text.split(/\s+/).length;
+  const shown = Math.ceil(words * clamp((t - 0.25) / Math.max(dur * 0.45, 0.8), 0, 1));
+  const lh = fs * 1.45, ty = (vertical ? H * 0.62 : H * 0.66) - (lines.length - 1) * lh / 2;
+  // خلفية النص
+  const boxW = Math.min(W * 0.92, Math.max(...lines.map(l => ctx.measureText(l).width)) + fs * 1.2);
+  const boxH = lines.length * lh + fs * 0.6;
+  ctx.fillStyle = 'rgba(0,0,0,0.32)';
+  roundRect(ctx, W / 2 - boxW / 2, ty - lh / 2 - fs * 0.3, boxW, boxH, fs * 0.5); ctx.fill();
+  let count = 0;
+  lines.forEach((ln, i) => {
+    const lw = ln.split(/\s+/); const vis = lw.slice(0, clamp(shown - count, 0, lw.length)).join(' '); count += lw.length;
+    if (!vis) return;
+    const slide = (1 - easeOut(clamp((t - 0.25 - i * 0.15) / 0.5, 0, 1))) * fs * 0.6;
+    ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = fs * 0.25;
+    // نرسم السطر كاملاً بشفافية منخفضة ثم الكلمات الظاهرة
+    ctx.globalAlpha = alpha * 0.18; ctx.fillText(ln, W / 2, ty + i * lh + slide);
+    ctx.globalAlpha = alpha;
+    if (vis === ln) ctx.fillText(ln, W / 2, ty + i * lh + slide);
+    else {
+      // كتابة جزئية: نقصّ الجزء الظاهر
+      const fullW = ctx.measureText(ln).width, visW = ctx.measureText(vis).width;
+      ctx.save(); ctx.beginPath();
+      const x0 = W / 2 - fullW / 2;
+      if (rtl) ctx.rect(x0 + fullW - visW - 4, ty + i * lh - lh / 2, visW + 8, lh);
+      else ctx.rect(x0 - 4, ty + i * lh - lh / 2, visW + 8, lh);
+      ctx.clip(); ctx.fillText(ln, W / 2, ty + i * lh + slide); ctx.restore();
+    }
+  });
+  ctx.restore();
+
+  // العنوان أعلى الشاشة
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.direction = isArabic(title) ? 'rtl' : 'ltr';
+  ctx.font = `700 ${Math.round(unit * 0.035)}px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  const tl = wrapText(ctx, title, W * 0.86).slice(0, 2);
+  tl.forEach((l, i) => ctx.fillText(l, W / 2, H * (vertical ? 0.07 : 0.08) + i * unit * 0.05));
+  // العلامة المائية
+  if (channel) { ctx.font = `700 ${Math.round(unit * 0.03)}px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillText(channel, W / 2, H * (vertical ? 0.88 : 0.9)); }
+  ctx.restore();
+
+  // نقاط المشاهد + شريط التقدم
+  const dotR = unit * 0.009, gap = dotR * 3.2, dx = W / 2 - (total - 1) * gap / 2;
+  for (let i = 0; i < total; i++) {
+    ctx.fillStyle = i === idx ? '#fff' : 'rgba(255,255,255,0.35)';
+    ctx.beginPath(); ctx.arc(dx + i * gap, H * (vertical ? 0.925 : 0.94), i === idx ? dotR * 1.4 : dotR, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(0, H - unit * 0.012, W, unit * 0.012);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, H - unit * 0.012, W * (gt / totalDur), unit * 0.012);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+/* ============ 3. الموسيقى المولّدة ============ */
+const N = f => f; // ترددات
+const MOODS = {
+  upbeat: { bpm: 112, chords: [[220, 277.18, 329.63], [185, 233.08, 277.18], [146.83, 185, 220], [164.81, 207.65, 246.94]], kick: true, wave: 'sawtooth' },
+  calm: { bpm: 72, chords: [[261.63, 329.63, 392], [220, 261.63, 329.63], [174.61, 220, 261.63], [196, 246.94, 293.66]], kick: false, wave: 'triangle' },
+  epic: { bpm: 90, chords: [[146.83, 174.61, 220], [116.54, 146.83, 174.61], [130.81, 164.81, 196], [110, 138.59, 164.81]], kick: true, wave: 'sawtooth' }
+};
+function scheduleMusic(actx, dest, mood, duration) {
+  const m = MOODS[mood] || MOODS.upbeat, beat = 60 / m.bpm, bar = beat * 4, t0 = actx.currentTime + 0.05;
+  const master = actx.createGain(); master.gain.setValueAtTime(0, t0);
+  master.gain.linearRampToValueAtTime(0.5, t0 + 1); master.gain.setValueAtTime(0.5, t0 + duration - 1.5);
+  master.gain.linearRampToValueAtTime(0, t0 + duration); master.connect(dest);
+  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.connect(master);
+  const bars = Math.ceil(duration / bar);
+  for (let b = 0; b < bars; b++) {
+    const ch = m.chords[b % m.chords.length], bs = t0 + b * bar;
+    // الوسادة
+    ch.forEach(f => {
+      const o = actx.createOscillator(), g = actx.createGain(); o.type = m.wave; o.frequency.value = f; o.detune.value = (Math.random() - 0.5) * 12;
+      g.gain.setValueAtTime(0, bs); g.gain.linearRampToValueAtTime(0.045, bs + 0.3); g.gain.linearRampToValueAtTime(0.0001, bs + bar);
+      o.connect(g); g.connect(lp); o.start(bs); o.stop(bs + bar + 0.05);
+    });
+    // الباص
+    const bo = actx.createOscillator(), bg = actx.createGain(); bo.type = 'sine'; bo.frequency.value = ch[0] / 2;
+    bg.gain.setValueAtTime(0.0001, bs); bg.gain.exponentialRampToValueAtTime(0.22, bs + 0.04); bg.gain.exponentialRampToValueAtTime(0.0001, bs + bar * 0.95);
+    bo.connect(bg); bg.connect(master); bo.start(bs); bo.stop(bs + bar);
+    // الأربيجيو
+    for (let s = 0; s < 8; s++) {
+      const st = bs + s * beat / 2, f = ch[s % 3] * (s >= 4 ? 2 : 1);
+      const o = actx.createOscillator(), g = actx.createGain(); o.type = 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(mood === 'calm' ? 0.05 : 0.07, st + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, st + beat * 0.45);
+      o.connect(g); g.connect(master); o.start(st); o.stop(st + beat / 2);
+    }
+    // الإيقاع
+    if (m.kick) for (let k = 0; k < 4; k++) {
+      const st = bs + k * beat, o = actx.createOscillator(), g = actx.createGain();
+      o.frequency.setValueAtTime(140, st); o.frequency.exponentialRampToValueAtTime(40, st + 0.15);
+      g.gain.setValueAtTime(0.5, st); g.gain.exponentialRampToValueAtTime(0.0001, st + 0.2);
+      o.connect(g); g.connect(master); o.start(st); o.stop(st + 0.22);
+    }
+  }
+}
+
+async function playFileMusic(actx, dest, file, duration) {
+  const buf = await actx.decodeAudioData(await file.arrayBuffer());
+  const src = actx.createBufferSource(), g = actx.createGain(), t0 = actx.currentTime;
+  src.buffer = buf; src.loop = true;
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.8, t0 + 0.8);
+  g.gain.setValueAtTime(0.8, t0 + duration - 1.2); g.gain.linearRampToValueAtTime(0, t0 + duration);
+  src.connect(g); g.connect(dest); src.start(t0); src.stop(t0 + duration + 0.1);
+}
+
+/* ============ 4. التسجيل ============ */
+let videoBlob = null, videoUrl = null;
+function pickMime() {
+  const list = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  return list.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+}
+
+async function makeVideo() {
+  const scenes = parseScenes();
+  if (!scenes.length) return toast('اكتب المشاهد أولاً (أو اضغط "اكتب السيناريو")', 'err');
+  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast('متصفحك لا يدعم صنع الفيديو. استخدم Chrome', 'err');
+  const btn = $('#btnMake'); btn.disabled = true; $('#btnUpload').disabled = true;
+  $('#result').style.display = 'none'; $('#stage').style.display = 'block'; $('#makeBar').style.display = 'block';
+  const status = $('#makeStatus'); status.textContent = 'جاري التحضير...';
+  let wakeLock = null; try { wakeLock = await navigator.wakeLock?.request('screen'); } catch (e) {}
+  try { await document.fonts.load(`900 40px Cairo`); await document.fonts.load(`700 40px Cairo`); } catch (e) {}
+
+  const vertical = $('#format').value === '9:16', W = vertical ? 720 : 1280, H = vertical ? 1280 : 720;
+  const cv = $('#cv'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
+  const durs = scenes.map(sceneDuration), starts = []; let acc = 0; durs.forEach(d => { starts.push(acc); acc += d; });
+  const totalDur = acc + 0.4;
+  const title = $('#title').value.trim(), channel = $('#channelName').value.trim(), pal = $('#palette').value;
+
+  const stream = cv.captureStream(30);
+  let actx = null;
+  const music = $('#music').value;
+  try {
+    if (music !== 'none') {
+      actx = new (window.AudioContext || window.webkitAudioContext)(); await actx.resume();
+      const dest = actx.createMediaStreamDestination();
+      if (music === 'file') {
+        const f = $('#musicFile').files[0];
+        if (f) await playFileMusic(actx, dest, f, totalDur); else { toast('لم تختر ملف موسيقى — سأستخدم موسيقى مولّدة'); scheduleMusic(actx, dest, 'upbeat', totalDur); }
+      } else scheduleMusic(actx, dest, music, totalDur);
+      dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr));
+    }
+  } catch (e) { toast('تعذّر تشغيل الصوت، سيُصنع الفيديو بدون موسيقى', 'err'); }
+
+  const mime = pickMime();
+  const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 5_000_000 } : { videoBitsPerSecond: 5_000_000 });
+  const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const done = new Promise(r => rec.onstop = r);
+  // ارسم أول إطار قبل البدء
+  drawFrame(ctx, W, H, { scene: scenes[0], t: 0, dur: durs[0], idx: 0, total: scenes.length, gt: 0, totalDur, pal, title, channel });
+  rec.start(250);
+  const t0 = performance.now();
+  await new Promise(resolve => {
+    function loop() {
+      const gt = (performance.now() - t0) / 1000;
+      if (gt >= totalDur) return resolve();
+      let i = starts.length - 1; while (i > 0 && gt < starts[i]) i--;
+      drawFrame(ctx, W, H, { scene: scenes[i], t: gt - starts[i], dur: durs[i], idx: i, total: scenes.length, gt, totalDur, pal, title, channel });
+      $('#makeBar i').style.width = (gt / totalDur * 100).toFixed(1) + '%';
+      status.textContent = `🎬 جاري التسجيل... المشهد ${i + 1} من ${scenes.length} (${Math.ceil(totalDur - gt)} ث متبقية)`;
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  });
+  rec.stop(); await done;
+  stream.getTracks().forEach(t => t.stop()); if (actx) actx.close();
+  try { wakeLock?.release(); } catch (e) {}
+
+  const type = (rec.mimeType || mime || 'video/webm').split(';')[0];
+  videoBlob = new Blob(chunks, { type });
+  if (videoUrl) URL.revokeObjectURL(videoUrl);
+  videoUrl = URL.createObjectURL(videoBlob);
+  const ext = type.includes('mp4') ? 'mp4' : 'webm';
+  $('#preview').src = videoUrl;
+  const dl = $('#btnDownload'); dl.href = videoUrl; dl.download = (title || 'tubegenie').replace(/[\\/:*?"<>|]/g, '').slice(0, 60) + '.' + ext;
+  $('#stage').style.display = 'none'; $('#result').style.display = 'block';
+  $('#makeBar i').style.width = '100%';
+  status.textContent = `✅ الفيديو جاهز — ${totalDur.toFixed(0)} ثانية، ${(videoBlob.size / 1048576).toFixed(1)} ميغابايت (${ext.toUpperCase()})`;
+  btn.disabled = false; $('#btnUpload').disabled = false;
+  toast('✅ الفيديو جاهز!', 'ok');
+}
+$('#btnMake').addEventListener('click', () => makeVideo().catch(e => { toast('خطأ: ' + e.message, 'err'); $('#btnMake').disabled = false; }));
+
+$('#btnShare').addEventListener('click', async () => {
+  if (!videoBlob) return;
+  const file = new File([videoBlob], $('#btnDownload').download, { type: videoBlob.type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: $('#title').value }); } catch (e) {}
+  } else toast('المشاركة غير مدعومة هنا — استخدم زر التحميل', 'err');
+});
+
+/* ============ 5. الرفع إلى يوتيوب ============ */
+let accessToken = null, tokenExp = 0;
+function signIn() {
+  return new Promise((resolve, reject) => {
+    const cid = $('#clientId').value.trim();
+    if (!cid) { $('#settingsBox').open = true; return reject(new Error('أضف Google Client ID في الإعدادات أولاً')); }
+    if (!window.google?.accounts?.oauth2) return reject(new Error('مكتبة Google لم تُحمّل بعد، انتظر ثانية وحاول مرة أخرى'));
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: cid, scope: 'https://www.googleapis.com/auth/youtube.upload',
+      callback: r => {
+        if (r.error) return reject(new Error(r.error_description || r.error));
+        accessToken = r.access_token; tokenExp = Date.now() + (Number(r.expires_in || 3600) - 60) * 1000; resolve(accessToken);
+      },
+      error_callback: e => reject(new Error(e.type === 'popup_closed' ? 'أُغلقت نافذة تسجيل الدخول' : (e.message || e.type)))
+    });
+    client.requestAccessToken();
+  });
+}
+
+function xhrSend(method, url, headers, body, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest(); x.open(method, url);
+    Object.entries(headers).forEach(([k, v]) => x.setRequestHeader(k, v));
+    x.upload.onprogress = e => e.lengthComputable && onProgress(e.loaded / e.total);
+    x.onload = () => {
+      let data = {}; try { data = JSON.parse(x.responseText); } catch (e) {}
+      if (x.status >= 200 && x.status < 300) resolve(data);
+      else reject(new Error(data.error?.message || ('HTTP ' + x.status)));
+    };
+    x.onerror = () => reject(new Error('فشل الاتصال بالشبكة'));
+    x.send(body);
+  });
+}
+
+async function uploadVideo() {
+  if (!videoBlob) return toast('اصنع الفيديو أولاً', 'err');
+  const btn = $('#btnUpload'), st = $('#upStatus'), bar = $('#upBar');
+  btn.disabled = true;
+  try {
+    const token = (accessToken && Date.now() < tokenExp) ? accessToken : await signIn();
+    const shorts = $('#format').value === '9:16';
+    let title = ($('#title').value.trim() || 'TubeGenie video').replace(/[<>]/g, '').slice(0, 100);
+    let description = $('#description').value.trim().replace(/[<>]/g, '');
+    if (shorts && !/#shorts/i.test(title + description)) description += '\n\n#Shorts';
+    let tags = $('#tags').value.split(/[,،]/).map(t => t.trim().replace(/[<>"]/g, '')).filter(Boolean), len = 0;
+    tags = tags.filter(t => (len += t.length + 2) <= 480);
+    const meta = {
+      snippet: { title, description, tags, categoryId: $('#category').value, defaultLanguage: $('#lang').value },
+      status: { privacyStatus: $('#privacy').value, selfDeclaredMadeForKids: false }
+    };
+    const type = videoBlob.type || 'video/webm';
+    st.textContent = '⏳ جاري التحضير للرفع...'; bar.style.display = 'block'; $('#upBar i').style.width = '0';
+    const prog = p => { $('#upBar i').style.width = (p * 100).toFixed(0) + '%'; st.textContent = `📤 جاري الرفع... ${(p * 100).toFixed(0)}%`; };
+
+    // رفع قابل للاستئناف
+    const r = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': type, 'X-Upload-Content-Length': String(videoBlob.size) },
+      body: JSON.stringify(meta)
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      if (r.status === 401) accessToken = null;
+      throw new Error(e.error?.message || ('HTTP ' + r.status));
+    }
+    const loc = r.headers.get('Location');
+    let result;
+    if (loc) {
+      result = await xhrSend('PUT', loc, { 'Content-Type': type }, videoBlob, prog);
+    } else {
+      // بديل: رفع multipart
+      const bd = 'tg' + Math.random().toString(36).slice(2);
+      const body = new Blob([`--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${bd}\r\nContent-Type: ${type}\r\n\r\n`, videoBlob, `\r\n--${bd}--`]);
+      result = await xhrSend('POST', 'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart&part=snippet,status',
+        { Authorization: 'Bearer ' + token, 'Content-Type': `multipart/related; boundary=${bd}` }, body, prog);
+    }
+    const id = result.id;
+    st.textContent = '✅ تم الرفع بنجاح! يوتيوب يعالج الفيديو الآن.';
+    const box = $('#ytLink'); box.style.display = 'block';
+    box.innerHTML = `🎉 الفيديو على يوتيوب:<br><a href="https://youtu.be/${id}" target="_blank" rel="noopener">https://youtu.be/${id}</a><br><small>الحالة: ${result.status?.privacyStatus || meta.status.privacyStatus} — إذا كان خاصاً، افتح YouTube Studio لإدارته.</small>`;
+    toast('✅ تم الرفع إلى يوتيوب!', 'ok');
+  } catch (e) {
+    st.textContent = '❌ ' + e.message;
+    toast('خطأ في الرفع: ' + e.message, 'err');
+  } finally { btn.disabled = false; }
+}
+$('#btnUpload').addEventListener('click', uploadVideo);
+
+/* تثبيت كتطبيق */
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
