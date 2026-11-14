@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>استوديو القصص – TubeGenie</title>
+<meta name="theme-color" content="#0f0f1a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+
+  :root{--bg:#0f0f1a;--card:#191927;--card2:#222235;--txt:#f1f1f7;--mut:#9a9ab3;--acc:#ff3d57;--acc2:#7c5cff;--ok:#22c55e;--line:#2d2d44}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:Cairo,system-ui,sans-serif;line-height:1.6;padding-bottom:40px}
+  header{padding:18px 16px 8px;text-align:center}
+  header h1{margin:0;font-size:26px;font-weight:900}
+  header h1 span{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  header p{margin:2px 0 0;color:var(--mut);font-size:14px}
+  main{max-width:720px;margin:0 auto;padding:0 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+  .card h2{margin:0 0 10px;font-size:18px;display:flex;align-items:center;gap:8px}
+  .step{background:linear-gradient(135deg,var(--acc),var(--acc2));width:26px;height:26px;border-radius:50%;display:inline-grid;place-items:center;font-size:14px}
+  label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+  input,textarea,select{width:100%;background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:15px}
+  textarea{min-height:90px;resize:vertical}
+  #scenes{min-height:170px;direction:auto}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  button{font:inherit;font-weight:700;border:0;border-radius:12px;padding:12px 16px;font-size:16px;cursor:pointer;width:100%;margin-top:12px;color:#fff;background:linear-gradient(135deg,var(--acc),var(--acc2))}
+  button.sec{background:var(--card2);border:1px solid var(--line)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  details summary{cursor:pointer;font-weight:700;font-size:16px}
+  .hint{font-size:12px;color:var(--mut);margin-top:4px}
+  .hint a{color:#9db4ff}
+  .stage{position:relative;margin-top:12px;display:none}
+  canvas,video{width:100%;max-height:70vh;object-fit:contain;background:#000;border-radius:12px;display:block}
+  .bar{height:8px;background:var(--card2);border-radius:8px;overflow:hidden;margin-top:8px;display:none}
+  .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .2s}
+  .status{font-size:14px;color:var(--mut);margin-top:6px;min-height:20px}
+  .result{display:none;margin-top:12px}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btns a,.btns button{margin-top:10px}
+  a.btn{display:block;text-align:center;text-decoration:none;color:#fff;font-weight:700;border-radius:12px;padding:12px;background:var(--card2);border:1px solid var(--line)}
+  .note{background:#2a2333;border:1px solid #4a3a5a;border-radius:10px;padding:10px;font-size:13px;margin-top:10px}
+  .yt-link{display:none;margin-top:10px;padding:12px;border-radius:10px;background:#12301e;border:1px solid #1f6b3a;word-break:break-all}
+  .yt-link a{color:#7dffa8;font-weight:700}
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(120px);background:#222235;border:1px solid var(--line);padding:12px 16px;border-radius:12px;max-width:92vw;transition:.3s;z-index:9;font-size:14px}
+  #toast.show{transform:translateX(-50%) translateY(0)}
+  #toast.err{border-color:var(--acc)}
+  #toast.ok{border-color:var(--ok)}
+
+  .nav{display:flex;gap:8px;justify-content:center;margin-top:10px}
+  .nav a{color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:8px 14px;border-radius:999px;background:var(--card2);border:1px solid var(--line)}
+  .nav a.on{background:linear-gradient(135deg,var(--acc),var(--acc2));border:0}
+  .scene{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:12px}
+  .scene.done{border-color:var(--ok)}
+  .scene h3{margin:0 0 6px;font-size:16px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .scene .sum{font-size:14px;margin:0 0 6px}
+  .scene .dlg{font-size:14px;color:#ffd98a;margin:4px 0}
+  .scene textarea{min-height:120px;font-size:12px;direction:ltr;text-align:left}
+  .mini{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .mini button{margin-top:8px;font-size:14px;padding:10px}
+  .chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut);white-space:nowrap}
+  .chk input{width:auto}
+  .char{background:#262640;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:13px}
+  .char b{color:#fff}
+  .clip{display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px;margin-top:8px;font-size:13px}
+  .clip .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:right}
+  .clip button{width:auto;margin:0;padding:6px 10px;font-size:13px;background:var(--card);border:1px solid var(--line)}
+  .badge{background:linear-gradient(135deg,var(--acc),var(--acc2));border-radius:8px;padding:2px 8px;font-weight:700}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎭 <span>استوديو القصص</span></h1>
+  <p>قصة ← أوامر Google Flow ← دمج المقاطع ← نشر</p>
+  <div class="nav"><a href="./">🎬 صانع الفيديو</a><a class="on" href="studio.html">🎭 استوديو القصص</a></div>
+</header>
+
+<main>
+  <!-- 1. الفكرة -->
+  <section class="card">
+    <h2><span class="step">1</span> فكرة القصة</h2>
+    <label for="idea">عن ماذا القصة؟</label>
+    <textarea id="idea" placeholder="مثال: ولد يكذب على أمه بخصوص واجبه المدرسي، ثم يتعلم أن الصدق أفضل"></textarea>
+    <div class="row">
+      <div>
+        <label for="dlang">لغة الحوار</label>
+        <select id="dlang">
+          <option value="Modern Standard Arabic (Fusha)">عربي فصحى</option>
+          <option value="Gulf Arabic dialect">عربي خليجي</option>
+          <option value="Egyptian Arabic dialect">عربي مصري</option>
+          <option value="Sudanese Arabic dialect">عربي سوداني</option>
+          <option value="English">English</option>
+        </select>
+      </div>
+      <div>
+        <label for="vstyle">الأسلوب</label>
+        <select id="vstyle">
+          <option value="pixar">كرتون 3D</option>
+          <option value="anime">أنمي</option>
+          <option value="clay">صلصال</option>
+          <option value="real">واقعي</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="nscenes">عدد المشاهد (8 ث لكل مشهد)</label>
+        <select id="nscenes"><option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option></select>
+      </div>
+      <div>
+        <label for="ratio">الشكل</label>
+        <select id="ratio"><option value="9:16">عمودي 9:16</option><option value="16:9">أفقي 16:9</option></select>
+      </div>
+    </div>
+    <button id="btnStory">✨ اكتب القصة وأوامر Flow</button>
+    <div class="status" id="storyStatus"></div>
+    <div class="hint">يستخدم مفتاح Gemini من إعدادات صانع الفيديو. الكتابة لا تستهلك رصيد الصوت.</div>
+  </section>
+
+  <!-- 2. المشاهد -->
+  <section class="card" id="storyBox" style="display:none">
+    <h2><span class="step">2</span> ولّد المشاهد في Google Flow</h2>
+    <div id="storyTitle" style="font-weight:900;font-size:18px"></div>
+    <div id="chars"></div>
+    <div class="note">
+      <b>الطريقة:</b> اضغط "📋 نسخ" لمشهد ← افتح Flow ← الصق الأمر واختر الشكل <b id="ratioHint">9:16</b> ← ولّد ← حمّل المقطع ← ارجع وعلّم "تم".
+      المقطع الناتج 8 ثوانٍ مع الصوت والحوار.
+    </div>
+    <div class="mini">
+      <a class="btn" href="https://labs.google/fx/tools/flow" target="_blank" rel="noopener" style="margin-top:10px">🎬 افتح Google Flow</a>
+      <button class="sec" id="btnCopyChars" style="margin-top:10px">📋 نسخ وصف الشخصيات</button>
+    </div>
+    <div id="scenesList"></div>
+    <button class="sec" id="btnReset">🗑️ قصة جديدة</button>
+  </section>
+
+  <!-- 3. المقاطع -->
+  <section class="card">
+    <h2><span class="step">3</span> دمج المقاطع في فيديو واحد</h2>
+    <label for="clipsIn">اختر المقاطع التي حمّلتها من Flow (بالترتيب)</label>
+    <input id="clipsIn" type="file" accept="video/*" multiple>
+    <div id="clipsList"></div>
+    <div class="row">
+      <div>
+        <label for="subs">الترجمة على الفيديو</label>
+        <select id="subs"><option value="dialogue">الحوار</option><option value="caption">عنوان المشهد</option><option value="none">بدون</option></select>
+      </div>
+      <div>
+        <label for="bgm">موسيقى خلفية</label>
+        <select id="bgm"><option value="none">بدون (صوت المقاطع فقط)</option><option value="calm">هادئة خفيفة</option><option value="epic">ملحمية خفيفة</option></select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="squality">الجودة</label>
+        <select id="squality"><option value="smooth">سلسة</option><option value="hd">عالية</option></select>
+      </div>
+      <div>
+        <label for="sformat">الصيغة</label>
+        <select id="sformat"><option value="mp4">MP4</option><option value="webm">WebM</option></select>
+      </div>
+    </div>
+    <button id="btnStitch" disabled>🎞️ ادمج المقاطع</button>
+    <div class="hint">⚠️ أبقِ الشاشة مفتوحة أثناء الدمج (يُسجَّل بزمنه الحقيقي).</div>
+    <div class="stage" id="stage"><canvas id="cv"></canvas></div>
+    <div class="bar" id="stBar"><i></i></div>
+    <div class="status" id="stStatus"></div>
+    <div class="result" id="result">
+      <video id="preview" controls playsinline></video>
+      <div class="btns">
+        <a class="btn" id="btnDownload" download>⬇️ تحميل</a>
+        <button class="sec" id="btnShare">📲 مشاركة (يوتيوب / تيك توك)</button>
+      </div>
+      <button class="sec" id="btnCopyMeta">📋 نسخ العنوان والوصف والوسوم</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('tg_' + k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('tg_' + k, v); } catch (e) {} }
+};
+let toastTimer;
+function toast(msg, type = '') {
+  const t = $('#toast'); t.textContent = msg; t.className = 'show ' + type;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = type, 4500);
+}
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const isArabic = s => /[؀-ۿ]/.test(s);
+const FONT = 'Cairo, "Segoe UI", Tahoma, sans-serif';
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); toast('✅ تم النسخ', 'ok'); }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('✅ تم النسخ', 'ok'); } catch (e2) { toast('انسخ النص يدوياً', 'err'); }
+    ta.remove();
+  }
+}
+['idea', 'dlang', 'vstyle', 'nscenes', 'ratio', 'subs', 'bgm', 'squality', 'sformat'].forEach(id => {
+  const el = $('#' + id); el.value = store.get('st_' + id, el.value);
+  el.addEventListener('change', () => store.set('st_' + id, el.value));
+});
+
+/* اتصال بـ Gemini مع استقبال تدريجي (SSE) ومهلة سكون */
+async function callGemini(key, model, prompt, onTick) {
+  const t0 = Date.now(), tick = setInterval(() => onTick(Math.round((Date.now() - t0) / 1000)), 1000);
+  const fatal = m => { const e = new Error(m); e.fatal = true; return e; };
+  let thinkLow = true;
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const gen = { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 2048 };
+      if (thinkLow) gen.thinkingConfig = { thinkingLevel: 'low' };
+      const ctl = new AbortController(); let idle = setTimeout(() => ctl.abort(), 45000);
+      const bump = () => { clearTimeout(idle); idle = setTimeout(() => ctl.abort(), 45000); };
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(key)}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: gen })
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({})), m = data.error?.message || ('HTTP ' + res.status);
+          if (res.status === 400 && thinkLow && /think/i.test(m)) { thinkLow = false; continue; }
+          if ((res.status === 429 || res.status === 503) && attempt < 2) { await new Promise(r => setTimeout(r, 8000)); continue; }
+          if (res.status === 400 && /api key/i.test(m)) throw fatal('مفتاح Gemini غير صحيح، انسخه مرة أخرى من AI Studio');
+          if (res.status === 403) throw fatal('المفتاح مرفوض: ' + m);
+          if (res.status === 404) throw new Error('النموذج ' + model + ' غير متاح');
+          if (res.status === 429) throw new Error('تجاوزت الحد المجاني المؤقت للنموذج ' + model);
+          throw new Error(m);
+        }
+        const reader = res.body.getReader(), dec = new TextDecoder(); let buf = '', out = '';
+        const eat = line => {
+          line = line.trim(); if (!line.startsWith('data:')) return;
+          try { const j = JSON.parse(line.slice(5)); out += (j.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join(''); } catch (e) {}
+        };
+        for (;;) {
+          const { value, done } = await reader.read(); if (done) break; bump();
+          buf += dec.decode(value, { stream: true });
+          let i; while ((i = buf.indexOf('\n')) >= 0) { eat(buf.slice(0, i)); buf = buf.slice(i + 1); }
+        }
+        eat(buf);
+        if (!out.trim()) throw new Error('رد فارغ من ' + model);
+        return out;
+      } catch (e) {
+        if (e.name === 'AbortError') throw new Error(`النموذج ${model} لم يرد خلال 45 ثانية`);
+        if (e instanceof TypeError) throw new Error('تعذّر الاتصال بـ Gemini، تأكد من الإنترنت');
+        throw e;
+      } finally { clearTimeout(idle); }
+    }
+    throw new Error('الخدمة مزدحمة، حاول بعد دقيقة');
+  } finally { clearInterval(tick); }
+}
+
+/* قائمة النماذج السريعة المتاحة لهذا المفتاح */
+async function listFastModels(key) {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(key)}`);
+    const data = await res.json();
+    const names = (data.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => m.name.replace('models/', ''))
+      .filter(n => /flash/i.test(n) && !/tts|image|live|audio|embed|thinking|exp|vision/i.test(n));
+    const ver = n => parseFloat((/gemini-(\d+(\.\d+)?)/.exec(n) || [])[1] || 0);
+    const score = n => ver(n) * 10 + (/lite/i.test(n) ? 3 : 0) + (/preview/i.test(n) ? -2 : 0) + (/latest/i.test(n) ? 1 : 0);
+    return names.sort((a, b) => score(b) - score(a));
+  } catch (e) { return []; }
+}
+
+
+/* ============ 1. كتابة القصة ============ */
+const VSTYLE = {
+  pixar: 'High-quality 3D animated cartoon style like a modern family animated feature film, soft studio lighting, expressive faces, big eyes, smooth stylized skin, vibrant colors.',
+  anime: 'Japanese anime style, clean cel shading, expressive eyes, vibrant colors, cinematic lighting.',
+  clay: 'Stop-motion claymation style, handmade clay textures, miniature set, warm lighting.',
+  real: 'Photorealistic cinematic live-action style, natural lighting, shallow depth of field, 35mm film look.'
+};
+let story = null;
+try { story = JSON.parse(store.get('story', 'null')); } catch (e) {}
+
+async function writeStory() {
+  const idea = $('#idea').value.trim();
+  if (!idea) return toast('اكتب فكرة القصة أولاً', 'err');
+  const key = store.get('geminiKey', '');
+  if (!key) return toast('أضف مفتاح Gemini في إعدادات صانع الفيديو أولاً', 'err');
+  const n = +$('#nscenes').value, dl = $('#dlang').value, style = VSTYLE[$('#vstyle').value], ratio = $('#ratio').value;
+  const prompt = `You are a professional short-film writer and expert prompt engineer for Google Veo 3.1 (each clip is 8 seconds, with native audio and lip-synced dialogue).
+Write an original short story video of exactly ${n} scenes about: "${idea}".
+Dialogue language: ${dl}. Visual style: ${style} Aspect ratio: ${ratio === '9:16' ? 'vertical 9:16' : 'horizontal 16:9'}.
+Return ONLY valid JSON:
+{"title": "catchy Arabic title, max 80 chars", "description": "2-3 Arabic sentences + 3 hashtags", "tags": ["8-12 Arabic tags"], "setting": "detailed English description of the main location", "characters": [{"name": "Arabic name", "look": "very detailed English visual description: age, gender, face, hair, skin tone, exact clothes with colors, accessories"}], "scenes": [{"summary": "one Arabic line describing what happens", "caption": "short Arabic subtitle, max 10 words", "dialogue": [{"speaker": "Arabic character name", "line": "exact spoken line in ${dl}"}], "prompt": "complete self-contained English Veo prompt"}]}
+Rules for every scene "prompt":
+- Start with this exact style sentence: "${style}"
+- Describe EVERY character in the shot by copying their full "look" text word for word (so they stay identical across scenes), then the setting.
+- Describe the action, emotions, facial expressions, camera shot and camera movement.
+- Write the dialogue as: [short character descriptor] says in ${dl}: "exact line". The lines must match the scene's "dialogue" array exactly.
+- Add natural ambient sounds. End with: "Vertical ${ratio} framing. No subtitles, no on-screen text, no background music."
+- Must fit in 8 seconds: at most 2 short dialogue lines, max 18 words total per scene.
+Story rules: scene 1 is a strong hook; include an emotional moment or twist; end with a satisfying ending (a lesson or a smile). Keep characters, clothes and setting consistent. Use only original characters (no famous, copyrighted or real people). Family-friendly. If religious themes appear, never depict prophets, companions or angels, and stay respectful.`;
+  const btn = $('#btnStory'), st = $('#storyStatus'); btn.disabled = true; st.textContent = '';
+  try {
+    let model = store.get('geminiModel', 'gemini-3.8-flash'), txt;
+    const tick = sec => { btn.textContent = `⏳ الذكاء الاصطناعي يكتب القصة... ${sec} ث`; };
+    try { st.textContent = '⏳ النموذج: ' + model; txt = await callGemini(key, model, prompt, tick); }
+    catch (e) {
+      if (e.fatal) throw e;
+      const alts = (await listFastModels(key)).filter(m => m !== model).slice(0, 3);
+      for (const m of alts) { try { st.textContent = '⏳ النموذج: ' + m; txt = await callGemini(key, m, prompt, tick); model = m; store.set('geminiModel', m); break; } catch (e2) { if (e2.fatal) throw e2; } }
+      if (!txt) throw e;
+    }
+    const clean = txt.replace(/```json|```/g, ''), a = clean.indexOf('{'), b = clean.lastIndexOf('}');
+    const s = JSON.parse(clean.slice(a, b + 1));
+    if (!Array.isArray(s.scenes) || !s.scenes.length) throw new Error('رد غير مكتمل، حاول مرة أخرى');
+    s.ratio = ratio; s.done = [];
+    story = s; store.set('story', JSON.stringify(s)); renderStory();
+    st.textContent = '✅ القصة جاهزة (' + model + ')';
+    $('#storyBox').scrollIntoView({ behavior: 'smooth' });
+  } catch (e) { st.textContent = '❌ ' + e.message; toast(e.message, 'err'); }
+  finally { btn.disabled = false; btn.textContent = '✨ اكتب القصة وأوامر Flow'; }
+}
+$('#btnStory').addEventListener('click', writeStory);
+
+function esc(t) { return String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function renderStory() {
+  if (!story) { $('#storyBox').style.display = 'none'; return; }
+  $('#storyBox').style.display = 'block';
+  $('#storyTitle').textContent = '🎬 ' + (story.title || '');
+  $('#ratioHint').textContent = story.ratio || '9:16';
+  $('#chars').innerHTML = (story.characters || []).map(c => `<div class="char"><b>👤 ${esc(c.name)}</b><div dir="ltr" style="text-align:left;color:var(--mut)">${esc(c.look)}</div></div>`).join('');
+  $('#scenesList').innerHTML = story.scenes.map((sc, i) => `
+    <div class="scene ${story.done?.[i] ? 'done' : ''}" data-i="${i}">
+      <h3><span><span class="badge">${i + 1}</span> المشهد ${i + 1}</span>
+        <label class="chk"><input type="checkbox" class="doneChk" ${story.done?.[i] ? 'checked' : ''}> تم</label></h3>
+      <p class="sum">${esc(sc.summary)}</p>
+      ${(sc.dialogue || []).map(d => `<div class="dlg">🗣️ <b>${esc(d.speaker)}:</b> ${esc(d.line)}</div>`).join('')}
+      <textarea class="prm">${esc(sc.prompt)}</textarea>
+      <button class="copyBtn">📋 نسخ أمر المشهد ${i + 1}</button>
+    </div>`).join('');
+  document.querySelectorAll('.scene').forEach(el => {
+    const i = +el.dataset.i;
+    el.querySelector('.copyBtn').onclick = () => copyText(el.querySelector('.prm').value);
+    el.querySelector('.prm').onchange = e => { story.scenes[i].prompt = e.target.value; store.set('story', JSON.stringify(story)); };
+    el.querySelector('.doneChk').onchange = e => { story.done = story.done || []; story.done[i] = e.target.checked; el.classList.toggle('done', e.target.checked); store.set('story', JSON.stringify(story)); };
+  });
+}
+$('#btnCopyChars').onclick = () => story && copyText((story.characters || []).map(c => `${c.name}: ${c.look}`).join('\n\n') + '\n\nSetting: ' + (story.setting || ''));
+$('#btnReset').onclick = () => { if (confirm('حذف القصة الحالية؟')) { story = null; store.set('story', 'null'); renderStory(); } };
+$('#btnCopyMeta').onclick = () => story ? copyText(`${story.title}\n\n${story.description}\n\n${(story.tags || []).map(t => '#' + t.replace(/\s+/g, '_')).join(' ')}`) : toast('لا توجد قصة', 'err');
+renderStory();
+
+/* ============ 2. المقاطع ============ */
+let clips = [];
+$('#clipsIn').addEventListener('change', async e => {
+  const files = [...e.target.files]; if (!files.length) return;
+  for (const f of files) {
+    const url = URL.createObjectURL(f);
+    const meta = await new Promise(res => {
+      const v = document.createElement('video'); v.preload = 'metadata'; v.src = url;
+      v.onloadedmetadata = () => res({ dur: v.duration, w: v.videoWidth, h: v.videoHeight });
+      v.onerror = () => res(null);
+    });
+    if (!meta) { toast('تعذّر قراءة: ' + f.name, 'err'); continue; }
+    clips.push({ file: f, url, name: f.name, ...meta });
+  }
+  e.target.value = ''; renderClips();
+});
+function renderClips() {
+  $('#clipsList').innerHTML = clips.map((c, i) => `<div class="clip"><span class="badge">${i + 1}</span><span class="nm">${esc(c.name)}</span><span>${c.dur.toFixed(1)}ث</span>
+    <button data-a="up" data-i="${i}">⬆️</button><button data-a="down" data-i="${i}">⬇️</button><button data-a="del" data-i="${i}">✖️</button></div>`).join('')
+    + (clips.length ? `<div class="hint">المجموع: ${clips.reduce((a, c) => a + c.dur, 0).toFixed(0)} ثانية. المقطع 1 = المشهد 1 في الترجمة.</div>` : '');
+  $('#clipsList').querySelectorAll('button').forEach(b => b.onclick = () => {
+    const i = +b.dataset.i, a = b.dataset.a;
+    if (a === 'up' && i > 0) [clips[i - 1], clips[i]] = [clips[i], clips[i - 1]];
+    if (a === 'down' && i < clips.length - 1) [clips[i + 1], clips[i]] = [clips[i], clips[i + 1]];
+    if (a === 'del') { URL.revokeObjectURL(clips[i].url); clips.splice(i, 1); }
+    renderClips();
+  });
+  $('#btnStitch').disabled = !clips.length;
+}
+
+/* ============ 3. الموسيقى المولّدة ============ */
+const N = f => f; // ترددات
+const MOODS = {
+  upbeat: { bpm: 112, chords: [[220, 277.18, 329.63], [185, 233.08, 277.18], [146.83, 185, 220], [164.81, 207.65, 246.94]], kick: true, wave: 'sawtooth' },
+  calm: { bpm: 72, chords: [[261.63, 329.63, 392], [220, 261.63, 329.63], [174.61, 220, 261.63], [196, 246.94, 293.66]], kick: false, wave: 'triangle' },
+  epic: { bpm: 90, chords: [[146.83, 174.61, 220], [116.54, 146.83, 174.61], [130.81, 164.81, 196], [110, 138.59, 164.81]], kick: true, wave: 'sawtooth' }
+};
+function scheduleMusic(actx, dest, mood, duration) {
+  const m = MOODS[mood] || MOODS.upbeat, beat = 60 / m.bpm, bar = beat * 4, t0 = actx.currentTime + 0.05;
+  const master = actx.createGain(); master.gain.setValueAtTime(0, t0);
+  master.gain.linearRampToValueAtTime(0.5, t0 + 1); master.gain.setValueAtTime(0.5, t0 + duration - 1.5);
+  master.gain.linearRampToValueAtTime(0, t0 + duration); master.connect(dest);
+  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.connect(master);
+  const bars = Math.ceil(duration / bar);
+  for (let b = 0; b < bars; b++) {
+    const ch = m.chords[b % m.chords.length], bs = t0 + b * bar;
+    // الوسادة
+    ch.forEach(f => {
+      const o = actx.createOscillator(), g = actx.createGain(); o.type = m.wave; o.frequency.value = f; o.detune.value = (Math.random() - 0.5) * 12;
+      g.gain.setValueAtTime(0, bs); g.gain.linearRampToValueAtTime(0.045, bs + 0.3); g.gain.linearRampToValueAtTime(0.0001, bs + bar);
+      o.connect(g); g.connect(lp); o.start(bs); o.stop(bs + bar + 0.05);
+    });
+    // الباص
+    const bo = actx.createOscillator(), bg = actx.createGain(); bo.type = 'sine'; bo.frequency.value = ch[0] / 2;
+    bg.gain.setValueAtTime(0.0001, bs); bg.gain.exponentialRampToValueAtTime(0.22, bs + 0.04); bg.gain.exponentialRampToValueAtTime(0.0001, bs + bar * 0.95);
+    bo.connect(bg); bg.connect(master); bo.start(bs); bo.stop(bs + bar);
+    // الأربيجيو
+    for (let s = 0; s < 8; s++) {
+      const st = bs + s * beat / 2, f = ch[s % 3] * (s >= 4 ? 2 : 1);
+      const o = actx.createOscillator(), g = actx.createGain(); o.type = 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(mood === 'calm' ? 0.05 : 0.07, st + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, st + beat * 0.45);
+      o.connect(g); g.connect(master); o.start(st); o.stop(st + beat / 2);
+    }
+    // الإيقاع
+    if (m.kick) for (let k = 0; k < 4; k++) {
+      const st = bs + k * beat, o = actx.createOscillator(), g = actx.createGain();
+      o.frequency.setValueAtTime(140, st); o.frequency.exponentialRampToValueAtTime(40, st + 0.15);
+      g.gain.setValueAtTime(0.5, st); g.gain.exponentialRampToValueAtTime(0.0001, st + 0.2);
+      o.connect(g); g.connect(master); o.start(st); o.stop(st + 0.22);
+    }
+  }
+}
+
+
+
+/* ============ 3. الدمج ============ */
+function wrapText(ctx, text, maxW) {
+  const words = String(text).split(/\s+/), lines = []; let line = '';
+  for (const w of words) { const t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
+  if (line) lines.push(line); return lines;
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function subtitleFor(i, t, d) {
+  const mode = $('#subs').value, sc = story?.scenes?.[i];
+  if (mode === 'none' || !sc) return '';
+  if (mode === 'caption') return sc.caption || '';
+  const lines = (sc.dialogue || []).filter(x => x.line); if (!lines.length) return sc.caption || '';
+  const k = Math.min(lines.length - 1, Math.floor(t / (d / lines.length)));
+  return lines[k].line;
+}
+function drawClip(ctx, W, H, v, i, t, d) {
+  const vw = v.videoWidth || W, vh = v.videoHeight || H, sc = Math.max(W / vw, H / vh);
+  const dw = vw * sc, dh = vh * sc;
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(v, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  const fade = Math.min(i > 0 ? clamp(t / 0.25, 0, 1) : 1, clamp((d - t) / 0.25, 0, 1));
+  if (fade < 1) { ctx.fillStyle = `rgba(0,0,0,${1 - fade})`; ctx.fillRect(0, 0, W, H); }
+  const sub = subtitleFor(i, t, d);
+  if (sub) {
+    const unit = Math.min(W, H), fs = Math.round(unit * 0.052);
+    ctx.save(); ctx.font = `700 ${fs}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.direction = isArabic(sub) ? 'rtl' : 'ltr';
+    const lines = wrapText(ctx, sub, W * 0.84).slice(0, 3), lh = fs * 1.4;
+    const bw = Math.min(W * 0.92, Math.max(...lines.map(l => ctx.measureText(l).width)) + fs * 1.1), bh = lines.length * lh + fs * 0.5;
+    const by = H * (H > W ? 0.8 : 0.84) - bh / 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; roundRect(ctx, W / 2 - bw / 2, by, bw, bh, fs * 0.4); ctx.fill();
+    ctx.fillStyle = '#fff'; lines.forEach((l, k) => ctx.fillText(l, W / 2, by + fs * 0.25 + lh / 2 + k * lh));
+    ctx.restore();
+  }
+}
+function pickMime() {
+  const mp4 = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a', 'video/mp4;codecs=avc1,opus', 'video/mp4'];
+  const webm = ['video/webm;codecs=vp8,opus', 'video/webm'];
+  const ok = m => window.MediaRecorder && MediaRecorder.isTypeSupported(m);
+  if ($('#sformat').value === 'mp4') { const m = mp4.find(ok); if (m) return m; }
+  return webm.find(ok) || mp4.find(ok) || '';
+}
+let outUrl = null, outBlob = null;
+async function stitch() {
+  const actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume();
+  try { await stitchInner(actx); } finally { try { actx.close(); } catch (e) {} }
+}
+async function stitchInner(actx) {
+  if (!clips.length) return;
+  if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) throw new Error('متصفحك لا يدعم الدمج، استخدم Chrome');
+  const btn = $('#btnStitch'), st = $('#stStatus'); btn.disabled = true;
+  $('#result').style.display = 'none'; $('#stage').style.display = 'block'; $('#stBar').style.display = 'block';
+  let wake = null; try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
+  try { await document.fonts.load(`700 40px Cairo`); } catch (e) {}
+  const vert = clips[0].h >= clips[0].w, L = $('#squality').value === 'hd' ? 1280 : 960;
+  const W = vert ? Math.round(L * 9 / 16) : L, H = vert ? L : Math.round(L * 9 / 16);
+  const cv = $('#cv'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
+  const total = clips.reduce((a, c) => a + c.dur, 0);
+  st.textContent = '⏳ تجهيز المقاطع...';
+  const vids = await Promise.all(clips.map(c => new Promise((res, rej) => {
+    const v = document.createElement('video'); v.playsInline = true; v.preload = 'auto'; v.src = c.url;
+    v.oncanplaythrough = () => res(v); v.onerror = () => rej(new Error('تعذّر تشغيل ' + c.name)); v.load();
+    setTimeout(() => res(v), 8000);
+  })));
+  await actx.resume();
+  const dest = actx.createMediaStreamDestination();
+  const bgm = $('#bgm').value;
+  if (bgm !== 'none') { const g = actx.createGain(); g.gain.value = 0.25; g.connect(dest); scheduleMusic(actx, g, bgm, total + 0.6); }
+  const stream = cv.captureStream(30);
+  dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+  const mime = pickMime(), hd = $('#squality').value === 'hd';
+  const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: hd ? 4_500_000 : 3_000_000 } : {});
+  const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const done = new Promise(r => rec.onstop = r);
+  drawClip(ctx, W, H, vids[0], 0, 0, clips[0].dur);
+  rec.start(1000);
+  let elapsed = 0;
+  for (let i = 0; i < vids.length; i++) {
+    const v = vids[i], d = clips[i].dur;
+    const src = actx.createMediaElementSource(v); src.connect(dest);
+    v.currentTime = 0;
+    try { await v.play(); } catch (e) { throw new Error('تعذّر تشغيل المقطع ' + (i + 1) + ': ' + e.message); }
+    await new Promise(resolve => {
+      const loop = () => {
+        const t = v.currentTime;
+        if (v.ended || t >= d - 0.03) return resolve();
+        drawClip(ctx, W, H, v, i, t, d);
+        $('#stBar i').style.width = ((elapsed + t) / total * 100).toFixed(1) + '%';
+        st.textContent = `🎞️ دمج المقطع ${i + 1} من ${vids.length}... (${Math.ceil(total - elapsed - t)} ث متبقية)`;
+        requestAnimationFrame(loop);
+      };
+      v.onended = resolve; loop();
+    });
+    v.pause(); src.disconnect(); elapsed += d;
+  }
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  await new Promise(r => setTimeout(r, 400)); rec.requestData(); await new Promise(r => setTimeout(r, 300));
+  rec.stop(); await done; stream.getTracks().forEach(t => t.stop());
+  vids.forEach(v => { v.removeAttribute('src'); v.load(); });
+  try { wake?.release(); } catch (e) {}
+  const type = (rec.mimeType || mime || 'video/webm').split(';')[0], ext = type.includes('mp4') ? 'mp4' : 'webm';
+  outBlob = new Blob(chunks, { type }); if (outUrl) URL.revokeObjectURL(outUrl); outUrl = URL.createObjectURL(outBlob);
+  $('#preview').src = outUrl;
+  const dl = $('#btnDownload'); dl.href = outUrl; dl.download = ((story?.title) || 'story').replace(/[\\/:*?"<>|]/g, '').slice(0, 60) + '.' + ext;
+  $('#stage').style.display = 'none'; $('#result').style.display = 'block'; $('#stBar i').style.width = '100%';
+  st.textContent = `✅ الفيديو جاهز: ${total.toFixed(0)} ثانية، ${(outBlob.size / 1048576).toFixed(1)} ميغابايت (${ext.toUpperCase()})`;
+  btn.disabled = false; toast('✅ تم دمج الفيديو!', 'ok');
+}
+$('#btnStitch').addEventListener('click', () => stitch().catch(e => { toast('خطأ: ' + e.message, 'err'); $('#stStatus').textContent = '❌ ' + e.message; $('#stage').style.display = 'none'; $('#btnStitch').disabled = false; }));
+$('#btnShare').addEventListener('click', async () => {
+  if (!outBlob) return;
+  const file = new File([outBlob], $('#btnDownload').download, { type: outBlob.type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: story?.title || '' }); } catch (e) {} }
+  else toast('المشاركة غير مدعومة هنا، استخدم زر التحميل', 'err');
+});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
-const CACHE = 'tubegenie-v9';
-const ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
+const CACHE = 'tubegenie-v10';
+const ASSETS = ['./', './index.html', './manifest.json', './icon.svg', './studio.html'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
