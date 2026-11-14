@@ -109,6 +109,8 @@
     </div>
     <label for="quality">الجودة</label>
     <select id="quality"><option value="smooth">سلسة 540p (أنسب للهاتف)</option><option value="hd">عالية 720p</option></select>
+    <label for="vformat">صيغة الملف</label>
+    <select id="vformat"><option value="mp4">MP4 (تيك توك، إنستغرام، يوتيوب)</option><option value="webm">WebM (أنعم على الهواتف الضعيفة)</option></select>
     <button id="btnScript">✨ اكتب السيناريو بالذكاء الاصطناعي</button>
     <div class="status" id="scriptStatus"></div>
   </section>
@@ -222,7 +224,7 @@ const isArabic = s => /[؀-ۿ]/.test(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 /* حفظ الإعدادات والحقول */
-['geminiKey', 'geminiModel', 'clientId', 'channelName', 'lang', 'format', 'palette', 'music', 'privacy', 'category', 'sceneCount', 'quality', 'voice', 'ttsVoice', 'ttsStyle', 'ttsModel'].forEach(id => {
+['geminiKey', 'geminiModel', 'clientId', 'channelName', 'lang', 'format', 'palette', 'music', 'privacy', 'category', 'sceneCount', 'quality', 'voice', 'ttsVoice', 'ttsStyle', 'ttsModel', 'vformat'].forEach(id => {
   const el = $('#' + id); el.value = store.get(id, el.value);
   el.addEventListener('change', () => store.set(id, el.value.trim()));
 });
@@ -730,8 +732,15 @@ $('#btnTestVoice').addEventListener('click', async () => {
 /* ============ 4. التسجيل ============ */
 let videoBlob = null, videoUrl = null;
 function pickMime() {
-  const list = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4'];
-  return list.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+  const mp4 = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a', 'video/mp4;codecs=avc1,opus', 'video/mp4'];
+  const webm = ['video/webm;codecs=vp8,opus', 'video/webm'];
+  const ok = m => window.MediaRecorder && MediaRecorder.isTypeSupported(m);
+  if ($('#vformat').value === 'mp4') {
+    const m = mp4.find(ok);
+    if (m) return m;
+    toast('متصفحك لا يدعم تسجيل MP4، سيُحفظ بصيغة WebM. حدّث Chrome لأحدث نسخة', 'err');
+  }
+  return webm.find(ok) || mp4.find(ok) || '';
 }
 
 async function makeVideo() {
