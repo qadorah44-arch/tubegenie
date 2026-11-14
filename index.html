@@ -156,7 +156,7 @@
       </div>
       <label for="ttsModel">نموذج الصوت</label>
       <input id="ttsModel" value="gemini-3.1-flash-tts-preview">
-      <div class="hint">يستخدم نفس مفتاح Gemini. إذا ظهر خطأ "model not found" فاكتب اسم نموذج الصوت الأحدث من AI Studio.</div>
+      <div class="hint">يستخدم نفس مفتاح Gemini. الخطة المجانية تسمح بحوالي 10 طلبات صوت يومياً: كل فيديو = طلب واحد، وكل ضغطة "جرّب الصوت" = طلب.</div>
       <button class="sec" id="btnTestVoice">🔊 جرّب الصوت</button>
     </div>
     <div id="micHint" class="hint" style="display:none">🎙️ عند الضغط على "اصنع الفيديو" اقرأ النص الظاهر على الشاشة بصوتك. المشاهد ستكون أطول قليلاً لتلحق بالقراءة، واستخدم سماعة بميكروفون في مكان هادئ.</div>
@@ -637,22 +637,34 @@ const STYLES = {
   energetic: 'Read the following Arabic text aloud in an energetic, engaging YouTube narrator voice, in clear Modern Standard Arabic',
   story: 'Read the following text aloud like a captivating storyteller, with natural pauses'
 };
-async function ttsScene(actx, text) {
+function ttsScene(actx, text) {
+  const style = $('#ttsStyle').value;
+  return ttsRequest(actx, `${STYLES[style] || STYLES.calm}:\n${text}`);
+}
+async function ttsRequest(actx, promptText) {
   const key = $('#geminiKey').value.trim();
   if (!key) throw new Error('الصوت بالذكاء الاصطناعي يحتاج مفتاح Gemini في الإعدادات');
   const model = $('#ttsModel').value.trim() || 'gemini-3.1-flash-tts-preview', voice = $('#ttsVoice').value, style = $('#ttsStyle').value;
-  const ck = [model, voice, style, text].join('|');
+  const ck = [model, voice, promptText].join('|');
   let audio = ttsCache.get(ck);
   for (let attempt = 0; !audio; attempt++) {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `${STYLES[style] || STYLES.calm}:\n${text}` }] }],
+        contents: [{ parts: [{ text: promptText }] }],
         generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } }
       })
     });
     const data = await res.json().catch(() => ({}));
-    if ((res.status === 429 || res.status === 503) && attempt < 3) { toast('⏳ ضغط على خدمة الصوت، انتظار 20 ثانية...'); await sleep(20000); continue; }
+    if (res.status === 429) {
+      const m = data.error?.message || '';
+      if (/per day|PerDay|retry in \d+h/i.test(m)) {
+        const h = (/retry in (\d+)h/i.exec(m) || [])[1];
+        throw new Error(`انتهى الحد اليومي المجاني للصوت${h ? `، يتجدد بعد ${h} ساعة تقريباً` : ''}. اختر الآن "بصوتي" أو "بدون" في التعليق الصوتي`);
+      }
+      if (attempt < 2) { toast('⏳ ضغط على خدمة الصوت، انتظار 20 ثانية...'); await sleep(20000); continue; }
+    }
+    if (res.status === 503 && attempt < 2) { toast('⏳ خدمة الصوت مزدحمة، انتظار 20 ثانية...'); await sleep(20000); continue; }
     if (!res.ok) throw new Error('الصوت: ' + (data.error?.message || ('HTTP ' + res.status)));
     const part = (data.candidates?.[0]?.content?.parts || []).find(p => p.inlineData?.data);
     if (!part) throw new Error('لم يرجع صوت من Gemini');
@@ -660,6 +672,38 @@ async function ttsScene(actx, text) {
     ttsCache.set(ck, audio);
   }
   return audioToBuffer(actx, audio);
+}
+/* طلب صوت واحد للسيناريو كله ثم تقسيمه على المشاهد عند فترات الصمت */
+async function ttsScript(actx, texts) {
+  const style = $('#ttsStyle').value;
+  const promptText = `${STYLES[style] || STYLES.calm}. Read each numbered paragraph in order, do NOT read the numbers, and pause for about one full second between paragraphs:\n\n` + texts.map((t, i) => `${i + 1}. ${t}`).join('\n\n');
+  const full = await ttsRequest(actx, promptText);
+  return splitBySilence(actx, full, texts);
+}
+function splitBySilence(actx, buf, texts) {
+  const n = texts.length, data = buf.getChannelData(0), sr = buf.sampleRate, win = Math.round(sr * 0.04), W = Math.floor(data.length / win);
+  if (n === 1) return [buf];
+  const rms = new Float32Array(W); let mx = 0;
+  for (let w = 0; w < W; w++) { let sum = 0; for (let i = w * win; i < (w + 1) * win; i++) sum += data[i] * data[i]; rms[w] = Math.sqrt(sum / win); if (rms[w] > mx) mx = rms[w]; }
+  const thr = mx * 0.06, runs = [];
+  let first = 0; while (first < W && rms[first] < thr) first++;
+  let last = W - 1; while (last > 0 && rms[last] < thr) last--;
+  for (let w = first, st = -1; w <= last; w++) {
+    if (rms[w] < thr) { if (st < 0) st = w; }
+    else if (st >= 0) { if ((w - st) * 0.04 >= 0.22) runs.push({ st, en: w, len: w - st }); st = -1; }
+  }
+  let cuts;
+  if (runs.length >= n - 1) {
+    cuts = runs.sort((a, b) => b.len - a.len).slice(0, n - 1).map(r => Math.round((r.st + r.en) / 2) * win).sort((a, b) => a - b);
+  } else { // تقسيم تقريبي حسب طول النص
+    const total = texts.reduce((a, t) => a + t.length, 0), span = (last - first) * win; let acc = 0; cuts = [];
+    for (let i = 0; i < n - 1; i++) { acc += texts[i].length; cuts.push(first * win + Math.round(span * acc / total)); }
+  }
+  const bounds = [first * win, ...cuts, Math.min(data.length, (last + 1) * win)];
+  return texts.map((_, i) => {
+    const a = bounds[i], b = Math.max(a + 1, bounds[i + 1]), out = actx.createBuffer(1, b - a, sr);
+    out.getChannelData(0).set(data.subarray(a, b)); return out;
+  });
 }
 async function audioToBuffer(actx, { b64, mime }) {
   const bin = atob(b64);
@@ -709,8 +753,8 @@ async function makeVideoInner(actx) {
   const cv = $('#cv'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
   const voiceMode = $('#voice').value; let voices = null, micStream = null;
   if (voiceMode === 'ai') {
-    voices = [];
-    for (let i = 0; i < scenes.length; i++) { status.textContent = `🔊 توليد الصوت العربي ${i + 1} من ${scenes.length}...`; voices.push(await ttsScene(actx, scenes[i].text)); }
+    status.textContent = '🔊 توليد الصوت العربي للسيناريو كاملاً (طلب واحد)...';
+    voices = await ttsScript(actx, scenes.map(sc => sc.text));
   } else if (voiceMode === 'mic') {
     status.textContent = '🎙️ اسمح للتطبيق باستخدام الميكروفون...';
     micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
