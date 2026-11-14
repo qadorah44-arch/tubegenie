@@ -1,4 +1,4 @@
-const CACHE = 'tubegenie-v1';
+const CACHE = 'tubegenie-v3';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {

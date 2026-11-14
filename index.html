@@ -107,6 +107,8 @@
         </select>
       </div>
     </div>
+    <label for="quality">الجودة</label>
+    <select id="quality"><option value="smooth">سلسة 540p (أنسب للهاتف)</option><option value="hd">عالية 720p</option></select>
     <button id="btnScript">✨ اكتب السيناريو بالذكاء الاصطناعي</button>
   </section>
 
@@ -119,8 +121,9 @@
     <textarea id="description"></textarea>
     <label for="tags">الوسوم (مفصولة بفاصلة)</label>
     <input id="tags">
-    <label for="scenes">المشاهد — سطر لكل مشهد بصيغة: إيموجي | النص</label>
+    <label for="scenes">المشاهد — سطر لكل مشهد: إيموجي | النص | الحركة | إيموجيات صغيرة</label>
     <textarea id="scenes" placeholder="🚀 | هل تعلم أن الفضاء صامت تماماً؟&#10;🌌 | ..."></textarea>
+    <div class="hint">الحركات: bounce قفز، swim سباحة، spin دوران، zoom نبض، shake اهتزاز، float طفو، orbit مدار، rain مطر، bubbles فقاعات، burst انفجار</div>
     <label for="music">الموسيقى</label>
     <select id="music">
       <option value="upbeat">مولّدة: حماسية</option>
@@ -192,7 +195,7 @@ const isArabic = s => /[؀-ۿ]/.test(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 /* حفظ الإعدادات والحقول */
-['geminiKey', 'geminiModel', 'clientId', 'channelName', 'lang', 'format', 'palette', 'music', 'privacy', 'category', 'sceneCount'].forEach(id => {
+['geminiKey', 'geminiModel', 'clientId', 'channelName', 'lang', 'format', 'palette', 'music', 'privacy', 'category', 'sceneCount', 'quality'].forEach(id => {
   const el = $('#' + id); el.value = store.get(id, el.value);
   el.addEventListener('change', () => store.set(id, el.value.trim()));
 });
@@ -214,7 +217,8 @@ function localScript(topic, lang, n) {
     ['🎯', 'Point three: consistency is the secret'], ['🤔', 'Which point surprised you? Comment below'],
     ['⭐', 'Share this with a friend who needs it'], ['👍', "Don't forget to like and subscribe"]
   ];
-  const scenes = base.slice(0, n - 1).concat([base[7]]).map(([emoji, text]) => ({ emoji, text }));
+  const PR = ['🔥✨', '💡⭐', '📌✅', '🚀⭐✨', '🎯✨', '❓💭', '⭐💫', '👍❤️🔔'];
+  const scenes = base.slice(0, n - 1).concat([base[7]]).map(([emoji, text], i) => ({ emoji, text, anim: ANIMS[i % ANIMS.length], props: PR[i % PR.length] }));
   return {
     title: ar ? `${topic} في أقل من دقيقة!` : `${topic} in under a minute!`,
     description: ar ? `فيديو سريع عن ${topic}. اشترك للمزيد!` : `A quick video about ${topic}. Subscribe for more!`,
@@ -226,7 +230,7 @@ function fillScript(s) {
   $('#title').value = (s.title || '').slice(0, 100);
   $('#description').value = s.description || '';
   $('#tags').value = (s.tags || []).join(', ');
-  $('#scenes').value = (s.scenes || []).map(x => `${x.emoji || '✨'} | ${x.text || ''}`).join('\n');
+  $('#scenes').value = (s.scenes || []).map((x, i) => `${x.emoji || '✨'} | ${x.text || ''} | ${ANIMS.includes(x.anim) ? x.anim : ANIMS[i % ANIMS.length]} | ${x.props || ''}`).join('\n');
 }
 
 async function generateScript() {
@@ -242,8 +246,8 @@ async function generateScript() {
   const prompt = `You are a top YouTube content creator. Create a ${shorts ? 'YouTube Shorts video (vertical, about 30-45 seconds)' : 'short YouTube video (about 45-60 seconds)'} about: "${topic}".
 Write ALL text in ${lang === 'ar' ? 'Modern Standard Arabic' : 'English'}.
 Return ONLY valid JSON with this shape:
-{"title": "catchy title, max 90 characters", "description": "2-4 engaging sentences followed by 3 relevant hashtags", "tags": ["8 to 12 short tags"], "scenes": [{"emoji": "one emoji", "text": "short on-screen sentence, max 14 words"}]}
-Rules: exactly ${n} scenes. Scene 1 is a strong hook. Each scene gives real, accurate, interesting value. The last scene is a call to action (like and subscribe). No markdown.`;
+{"title": "catchy title, max 90 characters", "description": "2-4 engaging sentences followed by 3 relevant hashtags", "tags": ["8 to 12 short tags"], "scenes": [{"emoji": "one main emoji (the character of the scene)", "text": "short on-screen sentence, max 14 words", "anim": "one of: bounce, swim, spin, zoom, shake, float, orbit, rain, bubbles, burst", "props": "2 to 4 small related emojis written together, e.g. 🫧🐟🌊"}]}
+Rules: exactly ${n} scenes. Pick the anim that best fits each scene's meaning (e.g. swim for sea animals, rain for weather, burst for surprises) and vary them. Scene 1 is a strong hook. Each scene gives real, accurate, interesting value. The last scene is a call to action (like and subscribe). No markdown.`;
   try {
     const model = ($('#geminiModel').value.trim() || 'gemini-3.8-flash');
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
@@ -267,8 +271,9 @@ $('#btnScript').addEventListener('click', generateScript);
 
 function parseScenes() {
   return $('#scenes').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
-    const i = l.indexOf('|');
-    return i >= 0 ? { emoji: l.slice(0, i).trim(), text: l.slice(i + 1).trim() } : { emoji: '', text: l };
+    const p = l.split('|').map(x => x.trim());
+    if (p.length === 1) return { emoji: '', text: p[0] };
+    return { emoji: p[0], text: p[1] || '', anim: (p[2] || '').toLowerCase(), props: p[3] || '' };
   }).filter(s => s.text || s.emoji);
 }
 
@@ -304,7 +309,7 @@ function drawFrame(ctx, W, H, o) {
   g.addColorStop(1, `hsl(${(c2[0] + shift) % 360},${c2[1]}%,${c2[2]}%)`);
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   // فقاعات متحركة
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 4; i++) {
     const x = W * (0.5 + 0.45 * Math.sin(gt * 0.3 + i * 1.7)), y = H * (0.5 + 0.45 * Math.cos(gt * 0.22 + i * 2.3));
     const r = Math.min(W, H) * (0.18 + 0.1 * Math.sin(i + gt * 0.5));
     const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -315,22 +320,24 @@ function drawFrame(ctx, W, H, o) {
   ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(0, 0, W, H);
 
   const vertical = H > W, unit = Math.min(W, H);
-  const fadeIn = clamp(t / 0.35, 0, 1), fadeOut = clamp((dur - t) / 0.35, 0, 1);
+  const fadeIn = clamp(t / 0.35, 0, 1), fadeOut = idx === total - 1 ? 1 : clamp((dur - t) / 0.35, 0, 1);
   const alpha = Math.min(fadeIn, fadeOut);
   const rtl = isArabic(scene.text);
   ctx.save(); ctx.globalAlpha = alpha; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.direction = rtl ? 'rtl' : 'ltr';
 
-  // الإيموجي
-  if (scene.emoji) {
-    const s = easeOutBack(clamp(t / 0.6, 0, 1));
-    const bob = Math.sin(gt * 2.2) * unit * 0.015;
-    const ey = vertical ? H * 0.3 : H * 0.28;
-    ctx.save(); ctx.translate(W / 2, ey + bob); ctx.scale(s, s); ctx.rotate(Math.sin(gt * 1.5) * 0.06);
-    ctx.font = `${Math.round(unit * (vertical ? 0.26 : 0.22))}px ${FONT}`;
-    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = unit * 0.04;
-    ctx.fillText(scene.emoji, 0, 0); ctx.restore();
-  }
+  // انتقال دخول المشهد
+  const tp = easeOut(clamp(t / 0.55, 0, 1)), trans = idx === 0 ? 'zoom' : ['slide', 'zoom', 'rotate', 'drop'][idx % 4];
+  ctx.translate(W / 2, H / 2);
+  if (trans === 'slide') ctx.translate((1 - tp) * W * 0.7 * (rtl ? -1 : 1), 0);
+  else if (trans === 'zoom') ctx.scale(0.55 + 0.45 * tp, 0.55 + 0.45 * tp);
+  else if (trans === 'rotate') ctx.rotate((1 - tp) * 0.5);
+  else ctx.translate(0, -(1 - tp) * H * 0.35);
+  ctx.translate(-W / 2, -H / 2);
+
+  // الإيموجي المتحرك + العناصر الصغيرة
+  if (scene.emoji) drawActors(ctx, W, H, scene, t, gt, idx, unit, vertical);
+
 
   // النص (كلمة بكلمة)
   const fs = Math.round(unit * (vertical ? 0.078 : 0.085));
@@ -349,7 +356,7 @@ function drawFrame(ctx, W, H, o) {
     const lw = ln.split(/\s+/); const vis = lw.slice(0, clamp(shown - count, 0, lw.length)).join(' '); count += lw.length;
     if (!vis) return;
     const slide = (1 - easeOut(clamp((t - 0.25 - i * 0.15) / 0.5, 0, 1))) * fs * 0.6;
-    ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = fs * 0.25;
+    ctx.fillStyle = '#fff';
     // نرسم السطر كاملاً بشفافية منخفضة ثم الكلمات الظاهرة
     ctx.globalAlpha = alpha * 0.18; ctx.fillText(ln, W / 2, ty + i * lh + slide);
     ctx.globalAlpha = alpha;
@@ -365,6 +372,9 @@ function drawFrame(ctx, W, H, o) {
     }
   });
   ctx.restore();
+
+  // وميض الانتقال
+  if (idx > 0 && t < 0.3) { ctx.fillStyle = `rgba(255,255,255,${0.45 * (1 - t / 0.3)})`; ctx.fillRect(0, 0, W, H); }
 
   // العنوان أعلى الشاشة
   ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.direction = isArabic(title) ? 'rtl' : 'ltr';
@@ -383,6 +393,78 @@ function drawFrame(ctx, W, H, o) {
   }
   ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(0, H - unit * 0.012, W, unit * 0.012);
   ctx.fillStyle = '#fff'; ctx.fillRect(0, H - unit * 0.012, W * (gt / totalDur), unit * 0.012);
+}
+
+/* ============ محرك الأنميشن ============ */
+const ANIMS = ['bounce', 'swim', 'spin', 'zoom', 'shake', 'float', 'orbit', 'rain', 'bubbles', 'burst'];
+const spriteCache = new Map();
+function sprite(e, size) {
+  size = Math.round(size); const k = e + '|' + size; let c = spriteCache.get(k); if (c) return c;
+  c = document.createElement('canvas'); c.width = c.height = Math.ceil(size * 1.35);
+  const x = c.getContext('2d'); x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = `${size}px "Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif`;
+  x.fillText(e, c.width / 2, c.height / 2 + size * 0.06);
+  if (spriteCache.size > 200) spriteCache.clear();
+  spriteCache.set(k, c); return c;
+}
+function drawSprite(ctx, e, size, x, y, rot = 0, sx = 1, sy = 1, a = 1) {
+  if (a <= 0) return;
+  const c = sprite(e, size); ctx.save(); ctx.globalAlpha *= a; ctx.translate(x, y);
+  if (rot) ctx.rotate(rot); if (sx !== 1 || sy !== 1) ctx.scale(sx, sy);
+  ctx.drawImage(c, -c.width / 2, -c.height / 2); ctx.restore();
+}
+const rnd = (i, seed) => { const v = Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453; return v - Math.floor(v); };
+function splitEmojis(str) {
+  if (!str) return [];
+  try { return [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(str)].map(x => x.segment).filter(x => x.trim()); }
+  catch (e) { return Array.from(str).filter(x => x.trim()); }
+}
+
+function drawActors(ctx, W, H, scene, t, gt, idx, unit, vertical) {
+  const anim = ANIMS.includes(scene.anim) ? scene.anim : ANIMS[idx % ANIMS.length];
+  let props = splitEmojis(scene.props).slice(0, 6); if (!props.length) props = ['✨', '⭐', '✨'];
+  const cx = W / 2, cy = vertical ? H * 0.3 : H * 0.28, size = unit * (vertical ? 0.26 : 0.22), ps = size * 0.32;
+  const pop = easeOutBack(clamp(t / 0.6, 0, 1));
+  let x = cx, y = cy, rot = 0, sx = pop, sy = pop;
+
+  // حركة الإيموجي الرئيسي
+  switch (anim) {
+    case 'bounce': { const b = Math.abs(Math.sin(t * 4)); y -= b * unit * 0.08; sx *= 1 + (1 - b) * 0.12; sy *= 1 - (1 - b) * 0.1; break; }
+    case 'swim': { x = cx + Math.sin(t * 1.3) * W * 0.24; y += Math.sin(t * 3.2) * unit * 0.03; rot = Math.sin(t * 3.2) * 0.12; if (Math.cos(t * 1.3) < 0) sx *= -1; break; }
+    case 'spin': rot = easeOut(clamp(t / 1.2, 0, 1)) * Math.PI * 2 + Math.sin(t * 2) * 0.1; break;
+    case 'zoom': { const z = 1 + 0.18 * Math.sin(t * 3.5); sx *= z; sy *= z; break; }
+    case 'shake': if (t % 1.4 < 0.35) { x += Math.sin(t * 60) * unit * 0.018; rot = Math.sin(t * 50) * 0.08; } break;
+    default: y += Math.sin(t * 1.6) * unit * 0.035; rot = Math.sin(t * 1.1) * 0.1;
+  }
+
+  // العناصر الصغيرة
+  const n = props.length, behind = [];
+  for (let i = 0; i < Math.max(n, 3); i++) {
+    const e = props[i % n], r1 = rnd(i, idx + 1), r2 = rnd(i + 7, idx + 3);
+    let px, py, pr = 0, pa = clamp((t - 0.2 - i * 0.08) / 0.4, 0, 1), psz = ps * (0.8 + r1 * 0.5);
+    if (anim === 'orbit') {
+      const a = t * 1.6 + i * (Math.PI * 2 / Math.max(n, 3)); px = x + Math.cos(a) * size * 0.85; py = y + Math.sin(a) * size * 0.45;
+      if (Math.sin(a) < 0) { behind.push([e, psz * 0.85, px, py, 0, pa * 0.8]); continue; }
+    } else if (anim === 'rain') {
+      const k = ((t * (0.25 + r1 * 0.2) + r2) % 1); px = W * (0.08 + 0.84 * r1); py = -psz + k * (H + psz * 2); pr = Math.sin(t * 2 + i) * 0.3;
+    } else if (anim === 'bubbles') {
+      const k = ((t * (0.18 + r1 * 0.15) + r2) % 1); px = W * (0.1 + 0.8 * r2) + Math.sin(t * 2 + i * 2) * unit * 0.04; py = H + psz - k * (H + psz * 2); pa *= 0.9;
+    } else if (anim === 'burst') {
+      const a = (i / Math.max(n, 3)) * Math.PI * 2 + r1 * 0.5, d = easeOut(clamp((t - 0.25) / 0.7, 0, 1)) * size * (1.1 + r2 * 0.4);
+      px = x + Math.cos(a) * d; py = y + Math.sin(a) * d * 0.8 + Math.sin(t * 2 + i) * unit * 0.01; pr = a + t;
+    } else {
+      // تطفو بلطف حول الأطراف
+      const side = i % 2 ? 1 : -1; px = cx + side * W * (0.3 + r1 * 0.12) + Math.sin(t * 0.9 + i) * unit * 0.03;
+      py = H * (0.15 + r2 * 0.7) + Math.cos(t * 1.2 + i) * unit * 0.04; pr = Math.sin(t + i) * 0.25;
+      pa *= 0.55 + 0.45 * Math.abs(Math.sin(t * 1.5 + i));
+    }
+    drawSprite(ctx, e, psz, px, py, pr, 1, 1, pa);
+  }
+  behind.forEach(b => drawSprite(ctx, ...b));
+  // ظل أرضي ناعم
+  ctx.save(); ctx.globalAlpha *= 0.18 * pop; ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.ellipse(x, cy + size * 0.62, size * 0.42 * Math.abs(sx), size * 0.08, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  drawSprite(ctx, scene.emoji, size, x, y, rot, sx, sy, 1);
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -445,7 +527,7 @@ async function playFileMusic(actx, dest, file, duration) {
 /* ============ 4. التسجيل ============ */
 let videoBlob = null, videoUrl = null;
 function pickMime() {
-  const list = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  const list = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4'];
   return list.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
 }
 
@@ -459,7 +541,8 @@ async function makeVideo() {
   let wakeLock = null; try { wakeLock = await navigator.wakeLock?.request('screen'); } catch (e) {}
   try { await document.fonts.load(`900 40px Cairo`); await document.fonts.load(`700 40px Cairo`); } catch (e) {}
 
-  const vertical = $('#format').value === '9:16', W = vertical ? 720 : 1280, H = vertical ? 1280 : 720;
+  const vertical = $('#format').value === '9:16', hd = $('#quality').value === 'hd';
+  const S = hd ? [720, 1280] : [540, 960], W = vertical ? S[0] : S[1], H = vertical ? S[1] : S[0];
   const cv = $('#cv'); cv.width = W; cv.height = H; const ctx = cv.getContext('2d');
   const durs = scenes.map(sceneDuration), starts = []; let acc = 0; durs.forEach(d => { starts.push(acc); acc += d; });
   const totalDur = acc + 0.4;
@@ -481,12 +564,12 @@ async function makeVideo() {
   } catch (e) { toast('تعذّر تشغيل الصوت، سيُصنع الفيديو بدون موسيقى', 'err'); }
 
   const mime = pickMime();
-  const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 5_000_000 } : { videoBitsPerSecond: 5_000_000 });
+  const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: hd ? 4_000_000 : 2_500_000 } : { videoBitsPerSecond: hd ? 4_000_000 : 2_500_000 });
   const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
   const done = new Promise(r => rec.onstop = r);
   // ارسم أول إطار قبل البدء
   drawFrame(ctx, W, H, { scene: scenes[0], t: 0, dur: durs[0], idx: 0, total: scenes.length, gt: 0, totalDur, pal, title, channel });
-  rec.start(250);
+  rec.start(1000);
   const t0 = performance.now();
   await new Promise(resolve => {
     function loop() {
@@ -500,6 +583,12 @@ async function makeVideo() {
     }
     requestAnimationFrame(loop);
   });
+  // تثبيت آخر إطار قليلاً حتى لا تتقطع النهاية
+  const last = scenes.length - 1;
+  drawFrame(ctx, W, H, { scene: scenes[last], t: durs[last] + 0.4, dur: durs[last], idx: last, total: scenes.length, gt: totalDur, totalDur, pal, title, channel });
+  await new Promise(r => setTimeout(r, 700));
+  rec.requestData();
+  await new Promise(r => setTimeout(r, 300));
   rec.stop(); await done;
   stream.getTracks().forEach(t => t.stop()); if (actx) actx.close();
   try { wakeLock?.release(); } catch (e) {}
