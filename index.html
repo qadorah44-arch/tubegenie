@@ -68,7 +68,7 @@
       <input id="geminiKey" type="password" placeholder="AIza..." autocomplete="off">
       <div class="hint">من <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. بدون مفتاح يعمل التطبيق بسيناريو بسيط.</div>
       <label for="geminiModel">نموذج Gemini</label>
-      <input id="geminiModel" value="gemini-2.5-flash">
+      <input id="geminiModel" value="gemini-3.8-flash">
       <div class="hint">إذا ظهر خطأ "model not found" غيّره لاسم أحدث من صفحة AI Studio.</div>
       <label for="clientId">Google OAuth Client ID (للرفع إلى يوتيوب)</label>
       <input id="clientId" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off">
@@ -245,7 +245,7 @@ Return ONLY valid JSON with this shape:
 {"title": "catchy title, max 90 characters", "description": "2-4 engaging sentences followed by 3 relevant hashtags", "tags": ["8 to 12 short tags"], "scenes": [{"emoji": "one emoji", "text": "short on-screen sentence, max 14 words"}]}
 Rules: exactly ${n} scenes. Scene 1 is a strong hook. Each scene gives real, accurate, interesting value. The last scene is a call to action (like and subscribe). No markdown.`;
   try {
-    const model = ($('#geminiModel').value.trim() || 'gemini-2.5-flash');
+    const model = ($('#geminiModel').value.trim() || 'gemini-3.8-flash');
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } })
