@@ -110,6 +110,7 @@
     <label for="quality">الجودة</label>
     <select id="quality"><option value="smooth">سلسة 540p (أنسب للهاتف)</option><option value="hd">عالية 720p</option></select>
     <button id="btnScript">✨ اكتب السيناريو بالذكاء الاصطناعي</button>
+    <div class="status" id="scriptStatus"></div>
   </section>
 
   <!-- 2. السيناريو -->
@@ -270,7 +271,7 @@ async function generateScript() {
     fillScript(localScript(topic, lang, n));
     return toast('تم إنشاء سيناريو بسيط بدون ذكاء اصطناعي. أضف مفتاح Gemini لنتيجة أفضل');
   }
-  const btn = $('#btnScript'); btn.disabled = true; btn.textContent = '⏳ الذكاء الاصطناعي يكتب...';
+  const btn = $('#btnScript'); btn.disabled = true; btn.textContent = '⏳ الذكاء الاصطناعي يكتب...'; $('#scriptStatus').textContent = '';
   const prompt = `You are a top YouTube content creator. Create a ${shorts ? 'YouTube Shorts video (vertical, about 30-45 seconds)' : 'short YouTube video (about 45-60 seconds)'} about: "${topic}".
 Write ALL text in ${lang === 'ar' ? 'Modern Standard Arabic' : 'English'}.
 Return ONLY valid JSON with this shape:
@@ -278,21 +279,44 @@ Return ONLY valid JSON with this shape:
 Rules: exactly ${n} scenes. If the topic is religious (e.g. Islamic), use ONLY well-established authentic information: for the Quran give the meaning with its reference (Surah name and verse number) instead of quoting the Arabic verse text; mention a hadith only if it is in Sahih al-Bukhari or Sahih Muslim and name the source; never invent or attribute anything uncertain; keep a respectful tone and use respectful emojis like 🕋🕌📖🌙⭐🤲 (no faces). Each scene text will also be read aloud, so write it as a natural, complete spoken sentence. Pick the anim that best fits each scene's meaning (e.g. swim for sea animals, rain for weather, burst for surprises) and vary them. Scene 1 is a strong hook. Each scene gives real, accurate, interesting value. The last scene is a call to action (like and subscribe). No markdown.`;
   try {
     const model = ($('#geminiModel').value.trim() || 'gemini-3.8-flash');
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message || ('HTTP ' + res.status));
+    const t0 = Date.now();
+    const tick = setInterval(() => { btn.textContent = `⏳ الذكاء الاصطناعي يكتب... ${Math.round((Date.now() - t0) / 1000)} ث`; }, 1000);
+    let res, data;
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 60000);
+        try {
+          res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } })
+          });
+          data = await res.json().catch(() => ({}));
+        } catch (e) {
+          if (e.name === 'AbortError') throw new Error('انتهت المهلة (60 ثانية). تأكد من الإنترنت، أو قلّل عدد المشاهد، ثم حاول مرة أخرى');
+          throw new Error('تعذّر الاتصال بـ Gemini، تأكد من الإنترنت (' + e.message + ')');
+        } finally { clearTimeout(to); }
+        if ((res.status === 429 || res.status === 503) && attempt === 0) { btn.textContent = '⏳ الخدمة مزدحمة، إعادة المحاولة...'; await new Promise(r => setTimeout(r, 8000)); continue; }
+        break;
+      }
+    } finally { clearInterval(tick); }
+    if (!res.ok) {
+      const m = data.error?.message || ('HTTP ' + res.status);
+      if (res.status === 400 && /api key/i.test(m)) throw new Error('مفتاح Gemini غير صحيح، انسخه مرة أخرى من AI Studio');
+      if (res.status === 404) throw new Error('اسم النموذج غير موجود: ' + model + '. ' + m);
+      if (res.status === 429) throw new Error('تجاوزت الحد المجاني المؤقت، انتظر دقيقة ثم حاول. ' + m);
+      throw new Error(m);
+    }
     let txt = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
     txt = txt.replace(/```json|```/g, '').trim();
     const a = txt.indexOf('{'), b = txt.lastIndexOf('}');
     const s = JSON.parse(txt.slice(a, b + 1));
     if (!Array.isArray(s.scenes) || !s.scenes.length) throw new Error('رد غير مكتمل من الذكاء الاصطناعي');
     fillScript(s);
+    $('#scriptStatus').textContent = '✅ السيناريو جاهز، انزل للأسفل لمراجعته';
     toast('✅ السيناريو جاهز! راجعه ثم اصنع الفيديو', 'ok');
   } catch (e) {
     toast('خطأ من Gemini: ' + e.message, 'err');
+    $('#scriptStatus').textContent = '❌ ' + e.message;
   } finally { btn.disabled = false; btn.textContent = '✨ اكتب السيناريو بالذكاء الاصطناعي'; }
 }
 $('#btnScript').addEventListener('click', generateScript);
