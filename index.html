@@ -283,19 +283,23 @@ Rules: exactly ${n} scenes. If the topic is religious (e.g. Islamic), use ONLY w
     const tick = setInterval(() => { btn.textContent = `⏳ الذكاء الاصطناعي يكتب... ${Math.round((Date.now() - t0) / 1000)} ث`; }, 1000);
     let res, data;
     try {
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 60000);
+      let useThinkLow = true;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 90000);
+        const gen = { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 2048 };
+        if (useThinkLow) gen.thinkingConfig = { thinkingLevel: 'low' };
         try {
           res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.9 } })
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: gen })
           });
           data = await res.json().catch(() => ({}));
         } catch (e) {
-          if (e.name === 'AbortError') throw new Error('انتهت المهلة (60 ثانية). تأكد من الإنترنت، أو قلّل عدد المشاهد، ثم حاول مرة أخرى');
+          if (e.name === 'AbortError') throw new Error('انتهت المهلة (90 ثانية). الإنترنت بطيء أو خدمة Gemini مزدحمة. جرّب شبكة Wi-Fi أخرى، أو قلّل عدد المشاهد إلى 4');
           throw new Error('تعذّر الاتصال بـ Gemini، تأكد من الإنترنت (' + e.message + ')');
         } finally { clearTimeout(to); }
-        if ((res.status === 429 || res.status === 503) && attempt === 0) { btn.textContent = '⏳ الخدمة مزدحمة، إعادة المحاولة...'; await new Promise(r => setTimeout(r, 8000)); continue; }
+        if (res.status === 400 && useThinkLow && /think/i.test(data.error?.message || '')) { useThinkLow = false; continue; }
+        if ((res.status === 429 || res.status === 503) && attempt < 2) { btn.textContent = '⏳ الخدمة مزدحمة، إعادة المحاولة...'; await new Promise(r => setTimeout(r, 8000)); continue; }
         break;
       }
     } finally { clearInterval(tick); }
