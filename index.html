@@ -277,51 +277,100 @@ Write ALL text in ${lang === 'ar' ? 'Modern Standard Arabic' : 'English'}.
 Return ONLY valid JSON with this shape:
 {"title": "catchy title, max 90 characters", "description": "2-4 engaging sentences followed by 3 relevant hashtags", "tags": ["8 to 12 short tags"], "scenes": [{"emoji": "one main emoji (the character of the scene)", "text": "short on-screen sentence, max 14 words", "anim": "one of: bounce, swim, spin, zoom, shake, float, orbit, rain, bubbles, burst", "props": "2 to 4 small related emojis written together, e.g. 🫧🐟🌊"}]}
 Rules: exactly ${n} scenes. If the topic is religious (e.g. Islamic), use ONLY well-established authentic information: for the Quran give the meaning with its reference (Surah name and verse number) instead of quoting the Arabic verse text; mention a hadith only if it is in Sahih al-Bukhari or Sahih Muslim and name the source; never invent or attribute anything uncertain; keep a respectful tone and use respectful emojis like 🕋🕌📖🌙⭐🤲 (no faces). Each scene text will also be read aloud, so write it as a natural, complete spoken sentence. Pick the anim that best fits each scene's meaning (e.g. swim for sea animals, rain for weather, burst for surprises) and vary them. Scene 1 is a strong hook. Each scene gives real, accurate, interesting value. The last scene is a call to action (like and subscribe). No markdown.`;
-  try {
-    const model = ($('#geminiModel').value.trim() || 'gemini-3.8-flash');
-    const t0 = Date.now();
-    const tick = setInterval(() => { btn.textContent = `⏳ الذكاء الاصطناعي يكتب... ${Math.round((Date.now() - t0) / 1000)} ث`; }, 1000);
-    let res, data;
-    try {
-      let useThinkLow = true;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 90000);
-        const gen = { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 2048 };
-        if (useThinkLow) gen.thinkingConfig = { thinkingLevel: 'low' };
-        try {
-          res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: gen })
-          });
-          data = await res.json().catch(() => ({}));
-        } catch (e) {
-          if (e.name === 'AbortError') throw new Error('انتهت المهلة (90 ثانية). الإنترنت بطيء أو خدمة Gemini مزدحمة. جرّب شبكة Wi-Fi أخرى، أو قلّل عدد المشاهد إلى 4');
-          throw new Error('تعذّر الاتصال بـ Gemini، تأكد من الإنترنت (' + e.message + ')');
-        } finally { clearTimeout(to); }
-        if (res.status === 400 && useThinkLow && /think/i.test(data.error?.message || '')) { useThinkLow = false; continue; }
-        if ((res.status === 429 || res.status === 503) && attempt < 2) { btn.textContent = '⏳ الخدمة مزدحمة، إعادة المحاولة...'; await new Promise(r => setTimeout(r, 8000)); continue; }
-        break;
-      }
-    } finally { clearInterval(tick); }
-    if (!res.ok) {
-      const m = data.error?.message || ('HTTP ' + res.status);
-      if (res.status === 400 && /api key/i.test(m)) throw new Error('مفتاح Gemini غير صحيح، انسخه مرة أخرى من AI Studio');
-      if (res.status === 404) throw new Error('اسم النموذج غير موجود: ' + model + '. ' + m);
-      if (res.status === 429) throw new Error('تجاوزت الحد المجاني المؤقت، انتظر دقيقة ثم حاول. ' + m);
-      throw new Error(m);
-    }
-    let txt = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
-    txt = txt.replace(/```json|```/g, '').trim();
-    const a = txt.indexOf('{'), b = txt.lastIndexOf('}');
-    const s = JSON.parse(txt.slice(a, b + 1));
+  const st = $('#scriptStatus');
+  const tryModel = async (model) => {
+    st.textContent = `⏳ النموذج: ${model}`;
+    const txt = await callGemini(key, model, prompt, sec => { btn.textContent = `⏳ الذكاء الاصطناعي يكتب... ${sec} ث`; });
+    const clean = txt.replace(/```json|```/g, ''), a = clean.indexOf('{'), b = clean.lastIndexOf('}');
+    const s = JSON.parse(clean.slice(a, b + 1));
     if (!Array.isArray(s.scenes) || !s.scenes.length) throw new Error('رد غير مكتمل من الذكاء الاصطناعي');
+    return s;
+  };
+  try {
+    let model = ($('#geminiModel').value.trim() || 'gemini-3.8-flash'), s = null, firstErr = null;
+    try { s = await tryModel(model); }
+    catch (e) {
+      if (e.fatal) throw e;
+      firstErr = e;
+      st.textContent = '🔎 النموذج لم يرد، أبحث عن نموذج أسرع متاح لمفتاحك...';
+      const alts = (await listFastModels(key)).filter(m => m !== model).slice(0, 3);
+      for (const m of alts) {
+        try { s = await tryModel(m); model = m; break; } catch (e2) { if (e2.fatal) throw e2; }
+      }
+      if (!s) throw new Error(firstErr.message + (alts.length ? ` (جرّبت أيضاً: ${alts.join('، ')})` : ''));
+      $('#geminiModel').value = model; store.set('geminiModel', model);
+      toast('✅ تم التحويل تلقائياً إلى النموذج: ' + model, 'ok');
+    }
     fillScript(s);
-    $('#scriptStatus').textContent = '✅ السيناريو جاهز، انزل للأسفل لمراجعته';
+    st.textContent = '✅ السيناريو جاهز (' + model + '). انزل للأسفل لمراجعته';
     toast('✅ السيناريو جاهز! راجعه ثم اصنع الفيديو', 'ok');
   } catch (e) {
     toast('خطأ من Gemini: ' + e.message, 'err');
-    $('#scriptStatus').textContent = '❌ ' + e.message;
+    st.textContent = '❌ ' + e.message;
   } finally { btn.disabled = false; btn.textContent = '✨ اكتب السيناريو بالذكاء الاصطناعي'; }
+}
+
+/* اتصال بـ Gemini مع استقبال تدريجي (SSE) ومهلة سكون */
+async function callGemini(key, model, prompt, onTick) {
+  const t0 = Date.now(), tick = setInterval(() => onTick(Math.round((Date.now() - t0) / 1000)), 1000);
+  const fatal = m => { const e = new Error(m); e.fatal = true; return e; };
+  let thinkLow = true;
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const gen = { responseMimeType: 'application/json', temperature: 0.9, maxOutputTokens: 2048 };
+      if (thinkLow) gen.thinkingConfig = { thinkingLevel: 'low' };
+      const ctl = new AbortController(); let idle = setTimeout(() => ctl.abort(), 45000);
+      const bump = () => { clearTimeout(idle); idle = setTimeout(() => ctl.abort(), 45000); };
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(key)}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: gen })
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({})), m = data.error?.message || ('HTTP ' + res.status);
+          if (res.status === 400 && thinkLow && /think/i.test(m)) { thinkLow = false; continue; }
+          if ((res.status === 429 || res.status === 503) && attempt < 2) { await new Promise(r => setTimeout(r, 8000)); continue; }
+          if (res.status === 400 && /api key/i.test(m)) throw fatal('مفتاح Gemini غير صحيح، انسخه مرة أخرى من AI Studio');
+          if (res.status === 403) throw fatal('المفتاح مرفوض: ' + m);
+          if (res.status === 404) throw new Error('النموذج ' + model + ' غير متاح');
+          if (res.status === 429) throw new Error('تجاوزت الحد المجاني المؤقت للنموذج ' + model);
+          throw new Error(m);
+        }
+        const reader = res.body.getReader(), dec = new TextDecoder(); let buf = '', out = '';
+        const eat = line => {
+          line = line.trim(); if (!line.startsWith('data:')) return;
+          try { const j = JSON.parse(line.slice(5)); out += (j.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join(''); } catch (e) {}
+        };
+        for (;;) {
+          const { value, done } = await reader.read(); if (done) break; bump();
+          buf += dec.decode(value, { stream: true });
+          let i; while ((i = buf.indexOf('\n')) >= 0) { eat(buf.slice(0, i)); buf = buf.slice(i + 1); }
+        }
+        eat(buf);
+        if (!out.trim()) throw new Error('رد فارغ من ' + model);
+        return out;
+      } catch (e) {
+        if (e.name === 'AbortError') throw new Error(`النموذج ${model} لم يرد خلال 45 ثانية`);
+        if (e instanceof TypeError) throw new Error('تعذّر الاتصال بـ Gemini، تأكد من الإنترنت');
+        throw e;
+      } finally { clearTimeout(idle); }
+    }
+    throw new Error('الخدمة مزدحمة، حاول بعد دقيقة');
+  } finally { clearInterval(tick); }
+}
+
+/* قائمة النماذج السريعة المتاحة لهذا المفتاح */
+async function listFastModels(key) {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(key)}`);
+    const data = await res.json();
+    const names = (data.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => m.name.replace('models/', ''))
+      .filter(n => /flash/i.test(n) && !/tts|image|live|audio|embed|thinking|exp|vision/i.test(n));
+    const ver = n => parseFloat((/gemini-(\d+(\.\d+)?)/.exec(n) || [])[1] || 0);
+    const score = n => ver(n) * 10 + (/lite/i.test(n) ? 3 : 0) + (/preview/i.test(n) ? -2 : 0) + (/latest/i.test(n) ? 1 : 0);
+    return names.sort((a, b) => score(b) - score(a));
+  } catch (e) { return []; }
 }
 $('#btnScript').addEventListener('click', generateScript);
 
